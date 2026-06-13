@@ -405,13 +405,31 @@ class FilterEngine:
         sintetico = df[df["classificacao_coia"] == "sintético"].copy()
         return limpo, sintetico
 
-    def metricas_resumo(self, df: pd.DataFrame) -> Dict:
-        """Retorna métricas resumidas após análise."""
-        if "score_contaminacao" not in df.columns:
-            return {}
-        total       = len(df)
-        n_sinteticos = (df["classificacao_coia"] == "sintético").sum()
-        n_humanos    = total - n_sinteticos
         return {
             "total_registros":   total,
-            "n_humanos":         int(
+            "n_humanos":         int(n_humanos),
+            "n_sinteticos":      int(n_sinteticos),
+            "taxa_contaminacao": round(n_sinteticos / total * 100, 1) if total > 0 else 0.0,
+            "score_medio":       round(df["score_contaminacao"].mean(), 3),
+            "score_max":         round(df["score_contaminacao"].max(), 3),
+            "score_min":         round(df["score_contaminacao"].min(), 3),
+        }
+
+
+# =============================================================================
+# Factory
+# =============================================================================
+
+def _estrategias_padrao() -> List[ScoreStrategy]:
+    return [
+        MarcadoresLLMStrategy(),         # marcadores_llm
+        UniformidadeSentencasStrategy(),  # uniformidade_sent
+        ComprimentoPalavrasStrategy(),    # comprimento_palavras
+        EstruturaParagrafoStrategy(),     # estrutura_paragrafo
+        EntropiaBigramasStrategy(),       # entropia_bigramas
+    ]
+
+
+def build_default_engine(limiar: float = DEFAULT_THRESHOLD) -> FilterEngine:
+    """Factory: cria FilterEngine com estratégias e pesos padrão."""
+    return FilterEngine(limiar=limiar)
