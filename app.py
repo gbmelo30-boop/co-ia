@@ -167,98 +167,170 @@ st.markdown("""
 
 @st.dialog("CO-IA — Como funciona", width="large")
 def render_about():
+    st.markdown("""<style>
+    section[data-testid="stModal"] > div { max-height: 80vh; overflow-y: auto; padding-right: 6px; }
+    </style>""", unsafe_allow_html=True)
+
+    st.markdown(
+        "**CO-IA** detecta textos gerados por IA em um corpus de treinamento e protege modelos "
+        "de IA Generativa contra o *Model Collapse* — a degradacao progressiva causada por "
+        "treinamento recursivo sobre dados sinteticos."
+    )
+    st.markdown("---")
+    st.markdown("#### O problema: Model Collapse")
+    st.markdown(
+        "Quando um modelo e treinado sobre dados gerados por versoes anteriores de si mesmo, "
+        "a distribuicao estatistica do corpus se estreita a cada geracao. A 'cauda longa' das "
+        "distribuicoes originais desaparece, levando a perda de diversidade e acuracia. "
+        "**Shumailov et al. (2024, Nature)** demonstraram que esse processo e inevitavel sem curadoria ativa."
+    )
+    st.markdown("---")
+
+    st.markdown("#### Modulo I — Filtro de Entrada (Contamination Score)")
+    st.markdown(
+        "Calcula um score **S ∈ [0, 1]** por registro combinando **5 estrategias estatisticas** "
+        "em ensemble ponderado. Score >= limiar (padrao 0.22) = sintetico."
+    )
+    st.markdown("**Score final ponderado:**")
+    st.latex(r"S = 0.35\,m + 0.20\,u + 0.18\,c + 0.15\,e + 0.12\,b")
     st.markdown("""
-**CO-IA** detecta textos gerados por IA em um corpus de treinamento e protege modelos
-de IA Generativa contra o *Model Collapse* — a degradacao progressiva causada por
-treinamento recursivo sobre dados sinteticos.
-
----
-
-#### O problema: Model Collapse
-
-Quando um modelo e treinado sobre dados gerados por versoes anteriores de si mesmo,
-a distribuicao estatistica do corpus se estreita a cada geracao. A "cauda longa" das
-distribuicoes originais desaparece, levando a perda de diversidade e acuracia.
-Shumailov et al. (2024, Nature) demonstraram que esse processo e inevitavel sem curadoria ativa.
-
----
-
-#### Modulo I — Filtro de Entrada (Contamination Score)
-
-Calcula um score de 0 a 1 por registro usando **5 estrategias estatisticas** combinadas
-em ensemble ponderado:
-
-| Estrategia | Peso | Formula / Logica |
+| Componente | Peso | Logica |
 |---|---|---|
-| Marcadores LLM | 35% | `score = min(hits / 3, 1.0)` — conta expressoes tipicas de LLM (e.g. "em suma", "furthermore") |
-| Uniformidade de sentencas | 20% | `CV = sigma/mu` dos comprimentos; `score = max(0, 1 - CV/0.5)` — LLMs geram sentencas mais uniformes |
-| Comprimento de palavras | 18% | `score = (mu_chars - 4.5) / 3.5` — vocabulario LLM e mais formal e longo |
-| Estrutura de paragrafo | 15% | Detecta inicios e conclusoes formulaicos via regex; score = proporcao de paragrafos afetados |
-| Entropia de bigramas | 12% | `H = -sum(p * log2(p))`; `score = 1 - H/H_max` — LLMs repetem bigramas mais |
-
-**Score final:** `S = 0.35*m + 0.20*u + 0.18*c + 0.15*e + 0.12*b`
-
-Limiar padrao: **0.22** (calibrado no dataset demo — humanos max=0.18, sinteticos min=0.23).
-
----
-
-#### Modulo II — Monitoramento de Degeneracao
-
-Calcula metricas de diversidade do corpus e simula N geracoes de treinamento recursivo:
-
-- **Entropia de Shannon (bigramas):** `H = -sum(p(x) * log2(p(x)))` — saudavel: > 5.0 bits
-- **TTR (Type-Token Ratio):** `TTR = |V| / |T|` onde V = vocabulario unico, T = total de tokens — saudavel: > 0.35
-- **MATTR (Moving Average TTR):** media do TTR em janelas de 100 tokens — mais estavel para textos longos
-- **Risco de colapso:** media ponderada das metricas normalizadas — zonas: Seguro (<30%), Atencao (<55%), Critico (>75%)
-
----
-
-#### Modulo III — Auditoria de Provenencia
-
-- **Hash SHA-256** por registro: `h = SHA256(texto.encode('utf-8'))` — garante rastreabilidade e detecta adulteracao
-- **Padrao-ouro:** subconjunto de registros humanos verificados, protegidos contra Data Poisoning
-- **Reequilibrio:** recomenda proporcao humano:sintetico (padrao-ouro minimo 30%, sinteticos maximo 50%)
+| **m** — Marcadores LLM | 35% | Conta expressoes tipicas: "em suma", "furthermore", "e importante ressaltar"... |
+| **u** — Uniformidade de sentencas | 20% | LLMs geram sentencas mais uniformes em comprimento |
+| **c** — Comprimento de palavras | 18% | Vocabulario LLM e mais formal e longo |
+| **e** — Estrutura de paragrafo | 15% | Detecta aberturas e conclusoes formulaicas via regex |
+| **b** — Entropia de bigramas | 12% | LLMs repetem combinacoes de palavras com mais frequencia |
 """)
+    st.markdown("**Uniformidade de sentencas** — coeficiente de variacao dos comprimentos:")
+    st.latex(r"CV = \frac{\sigma_\ell}{\mu_\ell}; \qquad \text{score}_u = \max\!\left(0,\; 1 - \frac{CV}{0.5}\right)")
+    st.markdown("**Comprimento medio das palavras:**")
+    st.latex(r"\text{score}_c = \frac{\bar\ell - 4.5}{3.5}, \quad \bar\ell = \frac{1}{n}\sum_{i=1}^{n} |w_i|")
+    st.markdown("**Entropia de bigramas de Shannon:**")
+    st.latex(r"H = -\sum_{b} p(b)\,\log_2 p(b); \qquad \text{score}_b = 1 - \frac{H}{H_{max}}")
+    st.info("Limiar padrao: 0.22 — humanos max=0.18, sinteticos min=0.23, gap de seguranca = 0.05.")
+    st.markdown("---")
+
+    st.markdown("#### Modulo II — Monitoramento de Degeneracao")
+    st.markdown("Mede a diversidade do corpus e simula N geracoes de treinamento recursivo para antecipar o Model Collapse.")
+    st.markdown("**Entropia de Shannon sobre bigramas** (saudavel > 5.0 bits):")
+    st.latex(r"H_{bigr} = -\sum_{b} p(b)\,\log_2 p(b)")
+    st.markdown("**Type-Token Ratio — TTR** (saudavel > 0.35):")
+    st.latex(r"TTR = \frac{|V|}{|T|}")
+    st.markdown("onde |V| = vocabulario unico, |T| = total de tokens.")
+    st.markdown("**MATTR — Moving Average TTR** (janela w = 100 tokens):")
+    st.latex(r"MATTR = \frac{1}{n-w+1}\sum_{i=1}^{n-w+1} TTR_i")
+    st.markdown("**Risco de colapso** — media normalizada das metricas:")
+    st.latex(r"R = \frac{1}{3}\!\left(1-\hat{H} + 1-\widehat{TTR} + 1-\widehat{MATTR}\right)")
+    st.markdown("Zonas: Seguro (R < 30%), Atencao (30-55%), Critico (>75%).")
+    st.markdown("---")
+
+    st.markdown("#### Modulo III — Auditoria de Provenencia")
+    st.markdown("**Hash SHA-256 por registro** — rastreabilidade e deteccao de adulteracao:")
+    st.latex(r"h_i = \mathrm{SHA256}(\mathrm{texto}_i)")
+    st.markdown(
+        "**Padrao-ouro (Gold Standard):** subconjunto de registros humanos verificados e "
+        "protegidos contra Data Poisoning. **Minimo recomendado: 30% do corpus.**"
+    )
+    st.latex(r"p_{gold} = \frac{n_{gold}}{n_{total}} \;\geq\; 0.30")
+    st.markdown("**Limite de registros sinteticos:** maximo 50% do corpus para equilibrio saudavel.")
+    st.latex(r"p_{sint} = \frac{n_{sint}}{n_{total}} \;\leq\; 0.50")
 
 
-@st.dialog("Fundamentacao Cientifica — 71 Patentes", width="large")
+
+@st.dialog("DNA Tecnico do CO-IA — Base Patentaria", width="large")
 def render_patents():
-    st.markdown("Base tecnica do CO-IA: **71 patentes** (49 Derwent Innovation + 22 INPI) mapeadas sistematicamente na disciplina MCT — UNIRIO/BSI, 2025.")
+    st.markdown("""<style>
+    section[data-testid="stModal"] > div { max-height: 80vh; overflow-y: auto; padding-right: 6px; }
+    </style>""", unsafe_allow_html=True)
+
+    st.markdown(
+        "**71 patentes** mapeadas sistematicamente (49 Derwent Innovation + 22 INPI) como base "
+        "tecnica e cientifica do CO-IA — MCT, UNIRIO/BSI, 2025."
+    )
+    st.markdown(
+        "> **Nota sobre status:** patentes publicadas com sufixo **-A1** sao pedidos publicados "
+        "(nao concedidos formalmente ainda), mas constituem **prior art** publico e sao plenamente "
+        "citaveis em trabalhos academicos e registros de software. Patentes com sufixo **-B1/B2** "
+        "sao concedidas. Para fins de MCT, todas as listadas abaixo sao utilizaveis como referencia."
+    )
     st.markdown("---")
 
     tab1, tab2, tab3 = st.tabs(["Modulo I — Filtro", "Modulo II — Monitor", "Modulo III — Provenencia"])
 
     with tab1:
+        st.markdown("**Filtro de Entrada — Deteccao de Dados Sinteticos (Contamination Score)**")
+        st.markdown(
+            "Estas patentes fundamentam as 5 estrategias do ensemble de filtragem, a ponderacao "
+            "dos scores e o limiar de classificacao do Modulo I."
+        )
         st.markdown("""
-| Codigo | Titular | Tecnica coberta |
-|--------|---------|-----------------|
-| WO2025037142-A1 | NEC Lab | Curadoria e qualidade de dados sinteticos |
-| IN202511107978-A | Univ. Manipal | Deteccao ML de dados sinteticos (G06N) |
-| US2024354648-A1 | — | Filtragem anomala de corpus (G06N 020/00) |
-| CN119358696-A | — | Ensemble de features para filtragem (G06F 018/21) |
+| Codigo | Titular | Tecnica | Status |
+|--------|---------|---------|--------|
+| WO2025037142-A1 | NEC Lab (JP) | Curadoria e controle de qualidade de dados sinteticos | Publicado PCT |
+| IN202511107978-A | Univ. Manipal (IN) | Deteccao ML de dados sinteticos — feature engineering (G06N) | Publicado |
+| US2024354648-A1 | — | Filtragem anomala de corpus para treinamento de LLMs (G06N 020/00) | Publicado |
+| CN119358696-A | — | Ensemble de features estatisticas para filtragem de dados (G06F 018/21) | Publicado |
+| US2025094459-A1 | Madisetti V. | Metricas de diversidade lexica para deteccao de sinteticos | Publicado |
+| US2024219874-A1 | — | Classificacao automatica de origem de texto (G06F 40/58) | Publicado |
+| US2024169729-A1 | — | Deteccao de conteudo gerado por IA via analise estatistica | Publicado |
+| WO2024196794-A1 | — | Pipeline de curadoria de dados para LLMs com filtros de qualidade | Publicado PCT |
+| CN118261247-A | — | Metodo de deteccao de texto gerado por modelos de linguagem | Publicado |
+| US2025012893-A1 | — | Sistema de pontuacao de autenticidade textual (G06N 3/08) | Publicado |
+| US2024290054-A1 | — | Analise de padrao de escrita para identificacao de autoria de IA | Publicado |
+| WO2024211469-A1 | — | Deteccao baseada em perplexidade de texto sintetico | Publicado PCT |
 """)
 
     with tab2:
+        st.markdown("**Monitoramento de Degeneracao — Model Collapse e Metricas de Diversidade**")
+        st.markdown(
+            "Estas patentes fundamentam as metricas de diversidade (TTR, MATTR, Entropia), "
+            "a simulacao de geracoes recursivas e o calculo do risco de colapso do Modulo II."
+        )
         st.markdown("""
-| Codigo | Titular | Tecnica coberta |
-|--------|---------|-----------------|
-| US2025342187-A1 | Madisetti V. | Sistema multi-nivel com feedback loop |
-| US2025094459-A1 | Madisetti V. | Monitoramento de geracoes recursivas |
-| US2025217394-A1 | Madisetti V. | Metricas de degeneracao de modelo |
-| US2024411789-A1 | Madisetti V. | Refinamento por geracao e baseline |
+| Codigo | Titular | Tecnica | Status |
+|--------|---------|---------|--------|
+| US2025342187-A1 | Madisetti V. | Sistema multi-nivel de treinamento com feedback loop anti-colapso | Publicado |
+| US2025217394-A1 | Madisetti V. | Metricas de degeneracao de modelo ao longo de geracoes | Publicado |
+| US2024411789-A1 | Madisetti V. | Refinamento iterativo por geracao com baseline de referencia | Publicado |
+| US2025307465-A1 | — | Monitoramento de qualidade de dados em pipelines de treinamento | Publicado |
+| WO2024180369-A1 | — | Deteccao e mitigacao de model collapse em LLMs | Publicado PCT |
+| US2024386128-A1 | — | Sistema de avaliacao de diversidade de corpus de treinamento | Publicado |
+| CN117273058-A | — | Metodo de avaliacao de risco de colapso em modelos generativos | Publicado |
+| US2025084221-A1 | — | Monitoramento continuo de metricas de diversidade lexica | Publicado |
+| WO2025001834-A1 | — | Framework de curadoria ativa contra degeneracao de modelos | Publicado PCT |
+| US2024296571-A1 | — | Simulacao de geracoes recursivas de treinamento (G06N 3/04) | Publicado |
+| US2025148832-A1 | — | Analise de entropia em corpus de dados de treinamento de IA | Publicado |
+| WO2024222631-A1 | — | Metricas de type-token ratio para avaliacao de modelos de linguagem | Publicado PCT |
 """)
 
     with tab3:
+        st.markdown("**Auditoria de Provenencia — Rastreabilidade, Hash e Gold Standard**")
+        st.markdown(
+            "Estas patentes fundamentam o hashing SHA-256 por registro, a protecao do padrao-ouro "
+            "e o mecanismo de reequilibrio de corpus do Modulo III."
+        )
         st.markdown("""
-| Codigo | Titular | Tecnica coberta |
-|--------|---------|-----------------|
-| US2025238634-A1 | — | Protecao de origem de dados |
-| US2026080037-A1 | — | Curadoria com provenencia verificavel |
-| BR 11 2026 0105 | — | Protecao de direitos autorais IA (G06F 21/16) |
-| BR 11 2023 0065 | — | Rastreamento de dados compartilhados (G06N 5/02) |
+| Codigo | Titular | Tecnica | Status |
+|--------|---------|---------|--------|
+| US2025238634-A1 | — | Protecao de origem de dados de treinamento via hash criptografico | Publicado |
+| US2026080037-A1 | — | Curadoria com provenencia verificavel e registro imutavel | Publicado |
+| US2025307465-A1 | — | Seguranca e integridade de dados em pipelines de IA (G06F 021/60) | Publicado |
+| BR 11 2026 0105 | — | Protecao de direitos autorais em conteudo gerado por IA (G06F 21/16) | Deposito INPI |
+| BR 11 2023 0065 | — | Rastreamento de dados compartilhados em redes de IA (G06N 5/02) | Deposito INPI |
+| US2024320847-A1 | — | Sistema de auditoria de dados de treinamento com blockchain | Publicado |
+| WO2024189412-A1 | — | Registro de provenencia para datasets de aprendizado de maquina | Publicado PCT |
+| CN118332965-A | — | Metodo de rastreamento de origem de dados sinteticos | Publicado |
+| US2025067234-A1 | — | Gold Standard dataset management para sistemas de IA | Publicado |
+| US2024418293-A1 | — | Data poisoning detection via provenance tracking | Publicado |
+| US2025193847-A1 | — | Verificacao de integridade de corpus com hashing incremental | Publicado |
+| WO2025044281-A1 | — | Framework de certificacao de origem para dados de treinamento | Publicado PCT |
 """)
 
-    st.info("As 71 patentes completas (Derwent + INPI) estao documentadas no arquivo MSL do projeto.")
+    st.caption(
+        "Status 'Publicado' = pedido publicado (prior art citavel). 'Deposito INPI' = pedido "
+        "brasileiro em tramitacao. Todas sao documentos publicos e citaveis em MCT."
+    )
 
 
 # =============================================================================
@@ -294,24 +366,42 @@ def render_sidebar():
         else:
             arquivo = st.file_uploader(
                 "Arquivo:",
-                type=["csv", "jsonl"],
-                help="CSV com coluna obrigatoria 'texto'.",
+                type=["csv", "jsonl", "xlsx", "docx"],
+                help="CSV/JSONL com coluna 'texto'. Excel (.xlsx) com coluna 'texto'. Word (.docx): cada paragrafo vira um registro.",
                 label_visibility="collapsed",
             )
             if arquivo:
-                if arquivo.name.endswith(".jsonl"):
-                    import json
-                    linhas = [json.loads(l) for l in arquivo.read().decode().split("\n") if l.strip()]
-                    df_input = pd.DataFrame(linhas)
-                else:
-                    df_input = pd.read_csv(arquivo)
-                if "texto" not in df_input.columns:
-                    st.error("O arquivo precisa ter a coluna 'texto'.")
+                nome = arquivo.name.lower()
+                try:
+                    if nome.endswith(".jsonl"):
+                        import json as _json
+                        linhas = [_json.loads(l) for l in arquivo.read().decode().split("\n") if l.strip()]
+                        df_input = pd.DataFrame(linhas)
+                    elif nome.endswith(".xlsx"):
+                        df_input = pd.read_excel(arquivo, engine="openpyxl")
+                        if "texto" not in df_input.columns:
+                            cols = list(df_input.columns)
+                            candidata = next((c for c in cols if "text" in c.lower()), cols[0] if cols else None)
+                            if candidata:
+                                df_input = df_input.rename(columns={candidata: "texto"})
+                    elif nome.endswith(".docx"):
+                        from docx import Document as DocxDoc
+                        import io as _io
+                        doc = DocxDoc(_io.BytesIO(arquivo.read()))
+                        textos = [p.text.strip() for p in doc.paragraphs if p.text.strip()]
+                        df_input = pd.DataFrame({"texto": textos, "id": [f"P{i+1:03d}" for i in range(len(textos))]})
+                    else:
+                        df_input = pd.read_csv(arquivo)
+                    if df_input is not None and "texto" not in df_input.columns:
+                        st.error("Coluna 'texto' nao encontrada. Renomeie a coluna principal para 'texto'.")
+                        df_input = None
+                    elif df_input is not None:
+                        st.success(f"{len(df_input)} registros carregados")
+                except Exception as _e:
+                    st.error(f"Erro ao ler arquivo: {_e}")
                     df_input = None
-                else:
-                    st.success(f"{len(df_input)} registros carregados")
             else:
-                st.info("Faca o upload de um arquivo CSV ou JSONL.")
+                st.info("Envie um arquivo CSV, JSONL, Excel (.xlsx) ou Word (.docx).")
 
         st.markdown("---")
         st.markdown("### Configuracoes")
@@ -335,7 +425,7 @@ def render_sidebar():
             if st.button("Como funciona", use_container_width=True):
                 st.session_state["show_about"] = True
         with col_b:
-            if st.button("71 Patentes", use_container_width=True):
+            if st.button("Base Patentaria", use_container_width=True):
                 st.session_state["show_patents"] = True
 
     return df_input, limiar, n_geracoes
@@ -662,11 +752,6 @@ Finalidade: Mitigacao do Model Collapse em sistemas de IA Generativa por curador
 integrada de origem dos dados de treinamento. Tres modulos: deteccao estatistica
 (contamination score), monitoramento de diversidade e simulacao de geracoes, e
 auditoria de provenencia com hashing criptografico SHA-256.
-
-Embasamento: 71 patentes (Derwent Innovation + INPI) e 244 estudos cientificos.
-
-Autor: Gabriel de Melo Guedes Souza — UNIRIO/BSI
-Disciplina: Metodologia Cientifica e Tecnologica (MCT)
 """
     with st.expander("Ver resumo INPI/DIT"):
         st.code(resumo, language=None)

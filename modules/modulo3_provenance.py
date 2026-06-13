@@ -231,8 +231,8 @@ class ProvenanceEngine:
             acao = f"Remover ou neutralizar pelo menos {int((proporcao_sint - SYNTHETIC_MAX_RATIO) * total)} registros sintéticos."
         elif proporcao_gold < GOLD_STANDARD_MIN_RATIO:
             status = "🔶 Atenção — padrão-ouro insuficiente"
-            n_needed = max(0, int((GOLD_STANDARD_MIN_RATIO - proporcao_gold) * total) + 1)
             min_total = int(total * GOLD_STANDARD_MIN_RATIO)
+            n_needed  = max(0, min_total - n_gold)
             acao = f"Voce marcou {n_gold} registros ({round(proporcao_gold*100,1)}%). O minimo recomendado e {min_total} registros (30%). Marque mais {n_needed} registros humanos como padrao-ouro."
         else:
             status = "✅ Corpus equilibrado"
