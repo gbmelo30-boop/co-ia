@@ -1,381 +1,238 @@
 # =============================================================================
-# CO-IA — Módulo I: Filtro de Entrada (Ingestão)
-# modulo1_filtro.py
+# CO-IA — Curadoria de Origem para IA
+# modules/modulo1_filtro.py — Modulo I: Filtro de Entrada
 #
-# Calcula o "contamination score" de cada registro textual e classifica como
-# humano ou sintético. Utiliza um ensemble de estratégias de pontuação
-# implementado com o padrão Strategy (GoF).
+# Padroes de projeto: Strategy (ScoreStrategy), Facade (FilterEngine),
+#                     Factory (build_default_engine)
 #
-# Fundamentação em patentes:
-#   • WO2025037142-A1  (NEC Lab)        — curadoria de qualidade de dados sintéticos
-#   • IN202511107978-A (Univ. Manipal)  — detecção ML de dados sintéticos
-#   • CN119358696-A    (G06F 018/21)    — ensemble de features para filtragem
-#   • US2024354648-A1  (G06N 020/00)    — filtragem anômala de corpus de treino
-#
-# Padrões de projeto:
-#   • Strategy  — cada dimensão de análise é uma ScoreStrategy intercambiável
-#   • Facade    — FilterEngine expõe interface simples ao dashboard
-#   • Factory   — build_default_engine() instancia o pipeline padrão
+# Patentes de referencia:
+#   WO2025037142-A1  — NEC Lab — curadoria e qualidade de dados sinteticos
+#   IN202511107978-A — Univ. Manipal — deteccao ML de dados sinteticos
+#   US2024354648-A1  — filtragem anomala de corpus (G06N 020/00)
+#   CN119358696-A    — ensemble de features para filtragem (G06F 018/21)
 # =============================================================================
 
 from __future__ import annotations
 
 import math
 import re
-import string
 from abc import ABC, abstractmethod
-from collections import Counter
-from typing import Dict, List, Optional, Tuple
+from typing import Dict, List, Tuple
 
 import numpy as np
 import pandas as pd
 
-from config import (
-    CONTAMINATION_WEIGHTS,
-    DEFAULT_THRESHOLD,
-    NGRAM_SIZE_FILTER,
-)
-
+from config import CONTAMINATION_WEIGHTS, DEFAULT_THRESHOLD
 
 # =============================================================================
-# Interface Strategy
+# Strategy — interface
 # =============================================================================
+
 
 class ScoreStrategy(ABC):
-    """
-    Interface base para todas as estratégias de pontuação.
-    Retorna float em [0, 1]: 0 = provavelmente humano, 1 = provavelmente sintético.
-    """
-
-    @property
-    @abstractmethod
-    def nome(self) -> str:
-        """Nome legível da estratégia."""
+    """Interface para estrategias de pontuacao de contaminacao."""
 
     @abstractmethod
     def calcular(self, texto: str) -> float:
-        """Calcula pontuação de suspeita. Valores altos → sintético."""
-
-    def _tokenizar(self, texto: str) -> List[str]:
-        """Tokenização simples por palavras, sem pontuação, em minúsculas."""
-        texto = texto.lower()
-        texto = texto.translate(str.maketrans("", "", string.punctuation))
-        return [t for t in texto.split() if t]
-
-    def _sentencas(self, texto: str) -> List[str]:
-        """Divide o texto em sentenças."""
-        return [s.strip() for s in re.split(r'[.!?]+', texto) if len(s.strip()) > 5]
+        """Retorna score 0.0-1.0 (1.0 = alta probabilidade de sintetico)."""
+        ...
 
 
 # =============================================================================
-# Estratégia 1 — Marcadores Léxicos de LLM  ← PRINCIPAL DISCRIMINADOR
-# Ref: WO2025037142-A1; US2025307236-A1 (G06F 016/23)
-#
-# Detecta expressões formulaicas típicas de saída de LLM: hedges, disclaimers,
-# conectivos estruturais e frases de abertura/encerramento padrão.
+# Estrategias concretas
 # =============================================================================
+
 
 class MarcadoresLLMStrategy(ScoreStrategy):
-    """
-    Detecta marcadores léxicos típicos de saída de LLM em PT e EN.
-    É a estratégia de maior poder discriminatório do ensemble.
-    Cada marcador presente acumula peso proporcional à sua especificidade.
+    """Detecta marcadores lexicos tipicos de LLMs.
+
+    Ref: IN202511107978-A (Univ. Manipal) — feature engineering para deteccao.
     """
 
-    # Marcadores de alta especificidade (peso 1.0 cada)
-    _MARCADORES_FORTES = [
-        r"\bé importante (notar|ressaltar|destacar|mencionar|considerar)\b",
-        r"\bit is important to (note|mention|consider|highlight|recognize)\b",
-        r"\bé (fundamental|essencial|crucial|relevante) (compreender|entender|destacar|observar)\b",
-        r"\bit is (crucial|essential|worth noting|noteworthy|imperative) that\b",
-        r"\bcabe (ressaltar|destacar|mencionar|observar)\b",
-        r"\bvale (ressaltar|destacar|mencionar|notar|observar)\b",
-        r"\bé imprescindível\b",
-        r"\bit is imperative\b",
-        r"\bin conclusion\b",
-        r"\bem conclusão\b",
-        r"\bto summarize\b",
+    _PADROES = [
+        r"\bem suma\b",
+        r"\bpor outro lado\b",
+        r"\baltamente\b",
+        r"\be importante (ressaltar|notar|destacar|mencionar)\b",
+        r"\be fundamental\b",
+        r"\be essencial\b",
+        r"\be crucial\b",
+        r"\bcabe destacar\b",
+        r"\bcabe ressaltar\b",
+        r"\bno contexto (de|do|da)\b",
+        r"\bno ambito\b",
+        r"\bpode-se (afirmar|concluir|observar|dizer)\b",
+        r"\be (valido|necessario|relevante|pertinente)\b",
+        r"\bdessa forma\b",
+        r"\bnesse sentido\b",
         r"\bin summary\b",
-        r"\bpara concluir\b",
-        r"\bin essence\b",
-        r"\bhas (emerged|become) (an|a) (increasingly|particularly)\b",
-        r"\btem se (consolidado|tornado) (uma|um)\b",
-        r"\brepresenta uma (abordagem|solução|contribuição|iniciativa)\b",
-        r"\boffers (several|numerous|many|various) (advantages|benefits|opportunities)\b",
-    ]
-
-    # Marcadores de média especificidade (peso 0.5 cada)
-    _MARCADORES_MEDIOS = [
+        r"\bin conclusion\b",
+        r"\bit is (important|crucial|essential|worth) (to note|to mention|noting)\b",
+        r"\bon the other hand\b",
         r"\bfurthermore\b",
         r"\bmoreover\b",
-        r"\badditionally\b",
-        r"\bin addition\b",
-        r"\bnonetheless\b",
         r"\bnevertheless\b",
-        r"\bnotwithstanding\b",
-        r"\bwhereas\b",
-        r"\balemais\b",
-        r"\balem disso\b",
-        r"\bdessa (forma|maneira|modo)\b",
-        r"\bnesse contexto\b",
         r"\bin this context\b",
-        r"\bit is (widely|commonly|generally) (recognized|accepted|known|understood)\b",
-        r"\bé (amplamente|comumente|geralmente) (reconhecido|aceito|utilizado)\b",
-        r"\bthis (approach|method|framework|technique) (enables|allows|facilitates|ensures)\b",
-        r"\besta (abordagem|solução|técnica) (permite|possibilita|garante|assegura)\b",
+        r"\bultimately\b",
+        r"\boverall\b",
+        r"\bin terms of\b",
     ]
-
-    @property
-    def nome(self) -> str:
-        return "Marcadores LLM"
+    _REGEX = [re.compile(p, re.IGNORECASE) for p in _PADROES]
 
     def calcular(self, texto: str) -> float:
-        texto_lower = texto.lower()
-        pontos = 0.0
+        if not texto or not texto.strip():
+            return 0.5
+        hits = sum(1 for rx in self._REGEX if rx.search(texto))
+        return round(min(hits / 3.0, 1.0), 4)
 
-        for padrao in self._MARCADORES_FORTES:
-            if re.search(padrao, texto_lower):
-                pontos += 1.0
-
-        for padrao in self._MARCADORES_MEDIOS:
-            if re.search(padrao, texto_lower):
-                pontos += 0.5
-
-        # Normalizar: 2+ pontos fortes → score ≈ 1.0
-        score = min(pontos / 2.5, 1.0)
-        return score
-
-
-# =============================================================================
-# Estratégia 2 — Uniformidade de Comprimento de Sentenças
-# Ref: CN119358696-A (G06F 018/21); IN202511107978-A
-#
-# LLMs produzem sentenças com comprimentos mais uniformes que humanos.
-# Baixo coeficiente de variação (CV) → suspeito.
-# =============================================================================
 
 class UniformidadeSentencasStrategy(ScoreStrategy):
-    """
-    Calcula o coeficiente de variação (CV = std/mean) dos comprimentos de sentença.
-    Textos humanos: CV alto (>0.45). Textos LLM: CV baixo (<0.25).
-    """
+    """Mede a uniformidade de comprimento das sentencas.
 
-    @property
-    def nome(self) -> str:
-        return "Uniformidade de Sentenças"
+    LLMs tendem a gerar sentencas com comprimento mais uniforme que humanos.
+    Ref: WO2025037142-A1 (NEC Lab).
+    """
 
     def calcular(self, texto: str) -> float:
-        sentencas = self._sentencas(texto)
+        if not texto or not texto.strip():
+            return 0.5
+        sentencas = re.split(r"[.!?]+", texto)
+        sentencas = [s.strip() for s in sentencas if len(s.strip()) > 10]
         if len(sentencas) < 2:
-            return 0.3  # inconclusivo mas ligeiramente suspeito
-
+            return 0.3
         comprimentos = [len(s.split()) for s in sentencas]
         media = np.mean(comprimentos)
-        if media < 3:
+        if media == 0:
             return 0.3
-
         cv = np.std(comprimentos) / media
-
-        # CV < 0.15 → muito uniforme → score = 1.0
-        # CV > 0.55 → variado        → score = 0.0
-        score = max(0.0, min((0.55 - cv) / 0.55, 1.0))
-        return round(score, 4)
-
-
-# =============================================================================
-# Estratégia 3 — Comprimento Médio de Palavras (Vocabulário Formal)
-# Ref: WO2025037142-A1; US2024354648-A1
-#
-# LLMs tendem a usar vocabulário mais formal com palavras mais longas.
-# Textos humanos informais usam palavras mais curtas.
-# =============================================================================
-
-class ComprimentoPalavrasStrategy(ScoreStrategy):
-    """
-    Calcula o comprimento médio das palavras no texto.
-    LLMs: avg ≥ 6.0 chars. Humanos informais: avg ≤ 5.0 chars.
-    """
-
-    @property
-    def nome(self) -> str:
-        return "Vocabulário Formal"
-
-    def calcular(self, texto: str) -> float:
-        tokens = self._tokenizar(texto)
-        # Ignorar palavras muito curtas (artigos, preposições)
-        palavras = [t for t in tokens if len(t) > 2]
-        if not palavras:
-            return 0.3
-
-        avg_len = np.mean([len(p) for p in palavras])
-
-        # avg_len ≤ 4.5 → provavelmente humano informal → score baixo
-        # avg_len ≥ 7.0 → provavelmente LLM formal      → score alto
-        score = max(0.0, (avg_len - 4.5) / 3.5)
+        score = max(0.0, 1.0 - cv / 0.5)
         return round(min(score, 1.0), 4)
 
 
-# =============================================================================
-# Estratégia 4 — Estrutura Típica de Parágrafo LLM
-# Ref: WO2025037142-A1; CN119358696-A (G06F 018/21)
-#
-# LLMs produzem parágrafos com estrutura introdução-desenvolvimento-conclusão
-# e tendem a iniciar sentenças com sujeitos formais e conectores específicos.
-# =============================================================================
+class ComprimentoPalavrasStrategy(ScoreStrategy):
+    """Mede o comprimento medio das palavras.
+
+    LLMs tendem a usar vocabulario formal com palavras mais longas.
+    Ref: CN119358696-A (G06F 018/21).
+    """
+
+    def calcular(self, texto: str) -> float:
+        if not texto or not texto.strip():
+            return 0.5
+        palavras = re.findall(r"\b[a-zA-Z]+\b", texto)
+        if not palavras:
+            return 0.5
+        media = np.mean([len(p) for p in palavras])
+        score = (media - 4.5) / (8.0 - 4.5)
+        return round(min(max(score, 0.0), 1.0), 4)
+
 
 class EstruturaParagrafoStrategy(ScoreStrategy):
-    """
-    Analisa padrões estruturais de parágrafo típicos de LLM:
-    - Sentenças iniciando com conectivos formais ou sujeitos impessoais
-    - Presença de estrutura 3+ sentenças bem balanceadas
-    - Uso de voz passiva impessoal
+    """Detecta padroes estruturais tipicos de LLMs em paragrafos.
+
+    Ref: US2024354648-A1 (G06N 020/00).
     """
 
-    # Padrões de início de sentença típicos de LLM
-    _INÍCIOS_LLM = [
-        r"^(it is|this is|these are|the use|the development|the integration|the role)\b",
-        r"^(moreover|furthermore|additionally|however|therefore|thus|consequently)\b",
-        r"^(é importante|isso ocorre|este processo|esta abordagem|o uso|o desenvolvimento|a integração)\b",
-        r"^(além disso|no entanto|portanto|dessa forma|nesse sentido|em virtude)\b",
-        r"^(in (recent|this|the context|conclusion|summary|addition))\b",
-        r"^(em (contextos|termos|suma|conclusão|resumo|virtude))\b",
-    ]
-
-    @property
-    def nome(self) -> str:
-        return "Estrutura de Parágrafo LLM"
+    _INICIOS = re.compile(
+        r"^(Primeiramente|Em primeiro lugar|Inicialmente|Alem disso|"
+        r"Por fim|Finalmente|Em suma|Dessa forma|Nesse sentido|"
+        r"First(ly)?|Secondly|Furthermore|Moreover|In addition|Finally|"
+        r"In conclusion|To summarize|Overall)",
+        re.IGNORECASE | re.MULTILINE,
+    )
+    _CONCLUSAO = re.compile(
+        r"(em conclusao|concluindo|portanto|assim sendo|"
+        r"in conclusion|to conclude|therefore|in summary)",
+        re.IGNORECASE,
+    )
 
     def calcular(self, texto: str) -> float:
-        sentencas = self._sentencas(texto)
-        if not sentencas:
-            return 0.0
+        if not texto or not texto.strip():
+            return 0.5
+        paragrafos = [p.strip() for p in texto.split("\n") if len(p.strip()) > 20]
+        if not paragrafos:
+            score = 0.1
+            if self._INICIOS.search(texto):
+                score += 0.4
+            if self._CONCLUSAO.search(texto):
+                score += 0.3
+            return round(min(score, 1.0), 4)
+        hits_inicio = sum(1 for p in paragrafos if self._INICIOS.match(p))
+        hits_conclusao = 1 if self._CONCLUSAO.search(texto) else 0
+        proporcao_inicio = hits_inicio / len(paragrafos)
+        score = proporcao_inicio * 0.7 + hits_conclusao * 0.3
+        return round(min(score, 1.0), 4)
 
-        n_sentencas = len(sentencas)
-        # Textos muito curtos (1 sentença) → inconclusivo
-        if n_sentencas < 2:
-            return 0.2
-
-        n_inícios_llm = 0
-        for sent in sentencas:
-            sent_lower = sent.strip().lower()
-            for padrao in self._INÍCIOS_LLM:
-                if re.match(padrao, sent_lower):
-                    n_inícios_llm += 1
-                    break
-
-        proporcao = n_inícios_llm / n_sentencas
-
-        # Voz passiva com "ser/estar + particípio"
-        n_passiva = len(re.findall(
-            r'\b(é|são|foi|foram|será|serão|está|estão)\s+\w+(?:ado|ada|ido|ida|ados|adas|idos|idas)\b',
-            texto.lower()
-        ))
-        score_passiva = min(n_passiva / max(n_sentencas, 1) * 2, 0.4)
-
-        score = min(proporcao * 1.2 + score_passiva, 1.0)
-        return round(score, 4)
-
-
-# =============================================================================
-# Estratégia 5 — Diversidade de N-Gramas (Entropia de Bigramas de Palavras)
-# Ref: WO2025037142-A1; US2024354648-A1
-#
-# Textos LLM tendem a usar combinações de palavras mais previsíveis,
-# resultando em menor entropia de bigramas normalizada pela extensão do texto.
-# =============================================================================
 
 class EntropiaBigramasStrategy(ScoreStrategy):
-    """
-    Calcula a razão entre bigramas únicos e bigramas totais.
-    Textos humanos: alta diversidade de bigramas (ratio próximo de 1.0).
-    Textos LLM: bigramas mais repetitivos apesar da extensão.
-    """
+    """Mede a diversidade de bigramas de palavras via entropia de Shannon.
 
-    @property
-    def nome(self) -> str:
-        return "Diversidade de Bigramas"
+    LLMs geram bigramas mais repetitivos que textos humanos.
+    Ref: US2025094459-A1 (Madisetti) — metricas de diversidade.
+    """
 
     def calcular(self, texto: str) -> float:
-        tokens = self._tokenizar(texto)
-        if len(tokens) < 4:
+        if not texto or not texto.strip():
+            return 0.5
+        palavras = re.findall(r"\b\w+\b", texto.lower())
+        if len(palavras) < 4:
             return 0.3
-
-        bigramas = [(tokens[i], tokens[i+1]) for i in range(len(tokens)-1)]
-        if not bigramas:
-            return 0.3
-
-        unicos = len(set(bigramas))
-        total  = len(bigramas)
-        ratio  = unicos / total  # 1.0 = todos únicos (muito diverso → humano)
-
-        # Calcular entropia normalizada
-        contagens = Counter(bigramas)
-        probs = [c/total for c in contagens.values()]
-        entropia = -sum(p * math.log2(p) for p in probs if p > 0)
+        bigramas = [(palavras[i], palavras[i + 1]) for i in range(len(palavras) - 1)]
+        freq: Dict[tuple, int] = {}
+        for bg in bigramas:
+            freq[bg] = freq.get(bg, 0) + 1
+        total = len(bigramas)
+        entropia = -sum((c / total) * math.log2(c / total) for c in freq.values())
         entropia_max = math.log2(total) if total > 1 else 1.0
-        entropia_norm = entropia / entropia_max if entropia_max > 0 else 0.5
-
-        # Alto ratio + alta entropia → humano (score baixo)
-        # Baixo ratio + baixa entropia → sintético (score alto)
-        # Invertemos: score = 1 - entropia_norm ponderada pelo ratio
-        score = (1 - entropia_norm) * 0.5 + (1 - ratio) * 0.5
+        diversidade = entropia / entropia_max if entropia_max > 0 else 0.5
+        score = 1.0 - diversidade
         return round(min(max(score, 0.0), 1.0), 4)
 
 
 # =============================================================================
-# FilterEngine — Fachada (Facade Pattern)
+# Facade — FilterEngine
 # =============================================================================
 
-class FilterEngine:
-    """
-    Motor principal do Módulo I.
-    Recebe DataFrame com coluna 'texto' e produz:
-      - score de contaminação por registro (0–1)
-      - classificação humano/sintético
-      - scores individuais por estratégia (explicabilidade)
 
-    Padrão Facade: esconde a complexidade do ensemble ao caller (app.py).
+class FilterEngine:
+    """Orquestra as estrategias de pontuacao e classifica textos.
+
+    Padrao Facade: expoe API simples sobre o ensemble de estrategias.
+    Ref: WO2025037142-A1, IN202511107978-A.
     """
 
     def __init__(
         self,
-        estrategias: Optional[List[ScoreStrategy]] = None,
-        pesos: Optional[Dict[str, float]] = None,
+        estrategias: List[ScoreStrategy] | None = None,
+        pesos: Dict[str, float] | None = None,
         limiar: float = DEFAULT_THRESHOLD,
     ):
-        if estrategias is None:
-            estrategias = _estrategias_padrao()
-        if pesos is None:
-            pesos = CONTAMINATION_WEIGHTS
-
-        self.estrategias = estrategias
-        self.pesos = pesos
         self.limiar = limiar
-
-        # Normalizar pesos
-        total_pesos = sum(pesos.values())
-        self._pesos_norm = {k: v / total_pesos for k, v in pesos.items()}
-        self._chaves_pesos = list(pesos.keys())
+        self.estrategias = estrategias or _estrategias_padrao()
+        pesos_raw = pesos or CONTAMINATION_WEIGHTS
+        self._chaves_pesos = list(pesos_raw.keys())
+        total = sum(pesos_raw.values()) or 1.0
+        self._pesos_norm = {k: v / total for k, v in pesos_raw.items()}
 
     # ------------------------------------------------------------------
-    # API pública
+    # API publica
     # ------------------------------------------------------------------
 
     def analisar_texto(self, texto: str) -> Dict:
-        """Analisa um único texto e retorna scores detalhados."""
+        """Analisa um unico texto e retorna scores detalhados."""
         scores_individuais = {}
         for estrategia, chave in zip(self.estrategias, self._chaves_pesos):
             try:
                 scores_individuais[chave] = round(estrategia.calcular(texto), 4)
             except Exception:
-                scores_individuais[chave] = 0.3  # fallback seguro
+                scores_individuais[chave] = 0.3
 
         score_total = sum(
             scores_individuais[k] * self._pesos_norm.get(k, 0)
             for k in self._chaves_pesos
         )
         score_total = round(min(max(score_total, 0.0), 1.0), 4)
-        classificacao = "sintético" if score_total >= self.limiar else "humano"
+        classificacao = "sintetico" if score_total >= self.limiar else "humano"
 
         return {
             "score_contaminacao": score_total,
@@ -401,14 +258,25 @@ class FilterEngine:
         """Retorna (corpus_limpo, corpus_sintetico)."""
         if "classificacao_coia" not in df.columns:
             df = self.analisar_dataset(df)
-        limpo     = df[df["classificacao_coia"] == "humano"].copy()
-        sintetico = df[df["classificacao_coia"] == "sintético"].copy()
+        limpo = df[df["classificacao_coia"] == "humano"].copy()
+        sintetico = df[df["classificacao_coia"] == "sintetico"].copy()
         return limpo, sintetico
 
+    def metricas_resumo(self, df: pd.DataFrame) -> Dict:
+        """Retorna metricas agregadas do dataset ja analisado.
+
+        Ref: CN119358696-A (G06F 018/21) — metricas de ensemble para auditoria.
+        """
+        if "score_contaminacao" not in df.columns:
+            return {}
+        total = len(df)
+        n_sinteticos = int((df["classificacao_coia"] == "sintetico").sum()) \
+            if "classificacao_coia" in df.columns else 0
+        n_humanos = total - n_sinteticos
         return {
             "total_registros":   total,
-            "n_humanos":         int(n_humanos),
-            "n_sinteticos":      int(n_sinteticos),
+            "n_humanos":         n_humanos,
+            "n_sinteticos":      n_sinteticos,
             "taxa_contaminacao": round(n_sinteticos / total * 100, 1) if total > 0 else 0.0,
             "score_medio":       round(df["score_contaminacao"].mean(), 3),
             "score_max":         round(df["score_contaminacao"].max(), 3),
@@ -420,16 +288,17 @@ class FilterEngine:
 # Factory
 # =============================================================================
 
+
 def _estrategias_padrao() -> List[ScoreStrategy]:
     return [
-        MarcadoresLLMStrategy(),         # marcadores_llm
-        UniformidadeSentencasStrategy(),  # uniformidade_sent
-        ComprimentoPalavrasStrategy(),    # comprimento_palavras
-        EstruturaParagrafoStrategy(),     # estrutura_paragrafo
-        EntropiaBigramasStrategy(),       # entropia_bigramas
+        MarcadoresLLMStrategy(),
+        UniformidadeSentencasStrategy(),
+        ComprimentoPalavrasStrategy(),
+        EstruturaParagrafoStrategy(),
+        EntropiaBigramasStrategy(),
     ]
 
 
 def build_default_engine(limiar: float = DEFAULT_THRESHOLD) -> FilterEngine:
-    """Factory: cria FilterEngine com estratégias e pesos padrão."""
+    """Factory: cria FilterEngine com estrategias e pesos padrao."""
     return FilterEngine(limiar=limiar)
