@@ -129,7 +129,7 @@ class ProvenanceRepository:
         return [r for r in self._registros.values() if r.is_gold_standard]
 
     def sinteticos(self) -> List[ProvenanceRecord]:
-        return [r for r in self._registros.values() if r.tipo_declarado == "sintético"]
+        return [r for r in self._registros.values() if r.tipo_declarado in ("sintetico", "sintético")]
 
     def humanos(self) -> List[ProvenanceRecord]:
         return [r for r in self._registros.values() if r.tipo_declarado == "humano"]
@@ -231,7 +231,9 @@ class ProvenanceEngine:
             acao = f"Remover ou neutralizar pelo menos {int((proporcao_sint - SYNTHETIC_MAX_RATIO) * total)} registros sintéticos."
         elif proporcao_gold < GOLD_STANDARD_MIN_RATIO:
             status = "🔶 Atenção — padrão-ouro insuficiente"
-            acao = f"Marcar pelo menos {int((GOLD_STANDARD_MIN_RATIO - proporcao_gold) * total)} registros humanos como padrão-ouro."
+            n_needed = max(0, int((GOLD_STANDARD_MIN_RATIO - proporcao_gold) * total) + 1)
+            min_total = int(total * GOLD_STANDARD_MIN_RATIO)
+            acao = f"Voce marcou {n_gold} registros ({round(proporcao_gold*100,1)}%). O minimo recomendado e {min_total} registros (30%). Marque mais {n_needed} registros humanos como padrao-ouro."
         else:
             status = "✅ Corpus equilibrado"
             acao = "Nenhuma ação imediata necessária. Continue monitorando."
@@ -270,9 +272,7 @@ class ReportBuilder:
         self._secoes.append(
             f"# {titulo}\n\n"
             f"> {subtitulo}\n\n"
-            f"**Versão:** {versao}  \n"
-            f"**Gerado em:** {datetime.now().strftime('%d/%m/%Y %H:%M')}  \n"
-            f"**Gerado por:** CO-IA Pipeline — UNIRIO / BSI\n\n---\n"
+            f"**Gerado em:** {datetime.now().strftime('%d/%m/%Y %H:%M')}\n\n---\n"
         )
         return self
 

@@ -10,6 +10,7 @@ import pandas as pd
 import plotly.express as px
 import plotly.graph_objects as go
 import streamlit as st
+import streamlit.components.v1 as components
 
 sys.path.insert(0, os.path.dirname(__file__))
 
@@ -154,35 +155,6 @@ st.markdown("""
         .block-container { padding-left: 0.5rem !important; padding-right: 0.5rem !important; }
     }
 
-    /* Botao flutuante de menu — sempre visivel */
-    #coia-menu-btn {
-        position: fixed;
-        left: 0;
-        top: 50%;
-        transform: translateY(-50%);
-        z-index: 99999;
-        background: #1e4a6e;
-        border: 1px solid #2a6a9a;
-        border-left: none;
-        border-radius: 0 10px 10px 0;
-        padding: 14px 10px;
-        cursor: pointer;
-        box-shadow: 3px 0 14px rgba(0,0,0,0.55);
-        display: flex;
-        flex-direction: column;
-        gap: 5px;
-        align-items: center;
-        transition: background 0.2s;
-    }
-    #coia-menu-btn:hover { background: #2a5f8a; }
-    #coia-menu-btn span {
-        display: block;
-        width: 18px;
-        height: 2px;
-        background: #7ab8e0;
-        border-radius: 2px;
-    }
-    #coia-menu-btn.hidden { display: none; }
 </style>
 """, unsafe_allow_html=True)
 
@@ -721,35 +693,43 @@ def main():
 
     df_input, limiar, n_geracoes = render_sidebar()
 
-    # Botao flutuante para reabrir a sidebar
-    st.markdown("""
-<div id="coia-menu-btn" title="Abrir menu lateral">
-  <span></span><span></span><span></span>
-</div>
+    # Botao flutuante para abrir/fechar sidebar — injetado no DOM pai via iframe
+    components.html("""
 <script>
 (function() {
-  function clickSidebarToggle() {
-    var collapsed = document.querySelector('[data-testid="collapsedControl"]');
-    if (collapsed) { collapsed.click(); return; }
-    var closeBtn = document.querySelector('[data-testid="stSidebarCollapseButton"] button');
-    if (closeBtn) { closeBtn.click(); return; }
+  var pd = window.parent ? window.parent.document : document;
+  // Remove botao anterior para evitar duplicatas
+  var old = pd.getElementById('coia-fab');
+  if (old) old.remove();
+  // Cria botao e injeta direto no body do pai
+  var btn = pd.createElement('button');
+  btn.id = 'coia-fab';
+  btn.title = 'Abrir ou fechar menu lateral';
+  btn.style.cssText = 'position:fixed;left:0;top:50%;transform:translateY(-50%);z-index:999999;background:#1e4a6e;border:1px solid #2a6a9a;border-left:none;border-radius:0 10px 10px 0;padding:14px 10px;cursor:pointer;box-shadow:3px 0 14px rgba(0,0,0,.55);display:flex;flex-direction:column;gap:5px;align-items:center;transition:background .2s';
+  var bar = 'display:block;width:18px;height:2px;background:#7ab8e0;border-radius:2px';
+  btn.innerHTML = '<span style="'+bar+'"></span><span style="'+bar+'"></span><span style="'+bar+'"></span>';
+  btn.addEventListener('mouseover', function(){this.style.background='#2a5f8a'});
+  btn.addEventListener('mouseout',  function(){this.style.background='#1e4a6e'});
+  btn.addEventListener('click', function() {
+    var c1 = pd.querySelector('[data-testid="collapsedControl"]');
+    if (c1) { c1.click(); return; }
+    var c2 = pd.querySelector('[data-testid="stSidebarCollapseButton"] button');
+    if (c2) { c2.click(); return; }
+    var c3 = pd.querySelector('button[aria-label*="sidebar"], button[aria-label*="Sidebar"]');
+    if (c3) { c3.click(); }
+  });
+  function sync() {
+    var sb = pd.querySelector('[data-testid="stSidebar"]');
+    if (!sb) return;
+    btn.style.display = sb.getBoundingClientRect().width > 50 ? 'none' : 'flex';
   }
-  function syncVisibility() {
-    var btn = document.getElementById('coia-menu-btn');
-    if (!btn) return;
-    var sidebar = document.querySelector('[data-testid="stSidebar"]');
-    if (sidebar) {
-      btn.style.display = sidebar.getBoundingClientRect().width > 50 ? 'none' : 'flex';
-    }
-  }
-  setTimeout(function() {
-    var btn = document.getElementById('coia-menu-btn');
-    if (btn) btn.addEventListener('click', clickSidebarToggle);
-    setInterval(syncVisibility, 400);
-  }, 200);
+  pd.body.appendChild(btn);
+  setInterval(sync, 350);
+  sync();
 })();
 </script>
-""", unsafe_allow_html=True)
+""", height=0)
+
 
     if df_input is None:
         st.markdown("""
