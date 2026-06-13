@@ -128,6 +128,35 @@ st.markdown("""
 
     /* Remover padding excessivo */
     .block-container { padding-top: 1.5rem !important; }
+
+    /* Botão de abrir/fechar sidebar — sempre visível */
+    [data-testid="collapsedControl"] { display: flex !important; visibility: visible !important; color: #c8d8e8 !important; }
+    button[kind="header"] { color: #c8d8e8 !important; }
+
+    /* Secao-title em dark mode — texto claro */
+    .section-title { color: #d0dae6 !important; border-bottom-color: #2a3f55 !important; }
+
+    /* Patent badge em dark mode */
+    .patent-badge { background: #1a2f44; border-color: #2a4a66; color: #7ab8e0; }
+
+    /* Risk labels: garantir texto legível em dark mode */
+    .risk-safe p, .risk-safe strong     { color: #2d6a32 !important; }
+    .risk-warning p, .risk-warning strong { color: #7a4500 !important; }
+    .risk-critical p, .risk-critical strong { color: #7a1515 !important; }
+
+    /* caption e st.caption — visível em dark mode */
+    [data-testid="stCaptionContainer"] p { color: #8aafc8 !important; }
+
+    /* Cards com fundo branco: forçar texto escuro */
+    .module-card, .module-card h4, .module-card p { color: #1a2533 !important; }
+
+    /* Responsividade */
+    @media (max-width: 768px) {
+        .coia-header { padding: 1.2rem 1rem 1rem; }
+        .coia-header h1 { font-size: 1.2rem; }
+        .coia-header .subtitle { font-size: 0.78rem; }
+        .block-container { padding-left: 0.5rem !important; padding-right: 0.5rem !important; }
+    }
 </style>
 """, unsafe_allow_html=True)
 
@@ -155,6 +184,18 @@ def render_sidebar():
             df_input = pd.read_csv(demo_path)
             st.success(f"Demo carregada — {len(df_input)} registros")
             st.caption("12 textos humanos + 12 sintéticos rotulados.")
+            with open(demo_path, "rb") as _f:
+                st.download_button(
+                    "Baixar CSV de demonstracao",
+                    _f.read(), "demo_dataset.csv", "text/csv",
+                    use_container_width=True,
+                )
+            with open(demo_path, "rb") as _f:
+                st.download_button(
+                    "Baixar CSV de demo",
+                    _f.read(), "demo_dataset.csv", "text/csv",
+                    use_container_width=True,
+                )
         else:
             arquivo = st.file_uploader(
                 "Arquivo:",
@@ -229,22 +270,7 @@ dos modelos ao longo das gerações.
 | **II — Monitoramento** | Calcula métricas de diversidade do corpus (entropia, TTR, MATTR) e simula a degradação ao longo de N gerações com e sem o CO-IA ativo |
 | **III — Proveniência** | Gera hash SHA-256 por registro, protege um conjunto padrão-ouro contra *Data Poisoning* e recomenda o reequilíbrio humano:sintético |
 
-**Base científica**
-
-Fundamentado em **71 patentes** (Derwent Innovation + INPI) e **244 estudos científicos**
-mapeados sistematicamente no âmbito da disciplina Metodologia Científica e Tecnológica
-(MCT) — UNIRIO / Bacharelado em Sistemas de Informação, 2025.
-
-**Principais patentes de referência:** WO2025037142-A1 (NEC Lab) · IN202511107978-A (Univ. Manipal) ·
-US2025342187-A1 (Madisetti) · US2025238634-A1 · BR 11 2026 0105 · BR 11 2023 0065
-
----
-
-**Autor:** Gabriel de Melo Guedes Souza — UNIRIO / BSI
-**Orientadora:** Prof.ª Maria Augusta Silveira Netto Nunes
-**Versão:** {ver}
-**Repositório:** [github.com/gbmelo30-boop/co-ia](https://github.com/gbmelo30-boop/co-ia)
-""".format(ver=APP_VERSION))
+""")
 
 
 # =============================================================================
@@ -376,11 +402,7 @@ def render_modulo1(df: pd.DataFrame, limiar: float):
     colunas = ["id", "texto", "score_contaminacao", "classificacao_coia"] + score_cols[:3]
     colunas = [c for c in colunas if c in df_resultado.columns]
 
-    def colorir(row):
-        cor = "#fff0f0" if row["classificacao_coia"] == "sintético" else "#f0fff4"
-        return [f"background-color: {cor}"] * len(row)
-
-    st.dataframe(df_resultado[colunas].style.apply(colorir, axis=1),
+    st.dataframe(df_resultado[colunas],
                  use_container_width=True, height=400)
 
     if "tipo_real" in df_resultado.columns:

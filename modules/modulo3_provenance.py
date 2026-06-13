@@ -341,12 +341,8 @@ class ReportBuilder:
         return self
 
     def adicionar_rodape(self) -> "ReportBuilder":
-        self._secoes.append(
-            "---\n\n"
-            "*Relatório gerado automaticamente pelo CO-IA (Curadoria de Origem para IA).*  \n"
-            "*Software desenvolvido por Gabriel de Melo Guedes Souza — UNIRIO / BSI.*  \n"
-            "*Disciplina: Metodologia Científica e Tecnológica (MCT) — Prof.ª Maria Augusta Silveira Netto Nunes.*\n"
-        )
+        # Rodapé minimalista — sem texto repetitivo
+        self._secoes.append("---\n")
         return self
 
     def build(self) -> str:
