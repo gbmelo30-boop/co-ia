@@ -177,64 +177,155 @@ def render_about():
         "treinamento recursivo sobre dados sinteticos."
     )
     st.markdown("---")
+
+    # ── Model Collapse ───────────────────────────────────────────────────────
     st.markdown("#### O problema: Model Collapse")
     st.markdown(
         "Quando um modelo e treinado sobre dados gerados por versoes anteriores de si mesmo, "
         "a distribuicao estatistica do corpus se estreita a cada geracao. A 'cauda longa' das "
         "distribuicoes originais desaparece, levando a perda de diversidade e acuracia. "
-        "**Shumailov et al. (2024, Nature)** demonstraram que esse processo e inevitavel sem curadoria ativa."
+        "**Shumailov et al. (2024, Nature)** demonstraram que esse processo e inevitavel sem curadoria ativa. "
+        "O CO-IA atua exatamente nesse ponto: antes de treinar, garantindo que o corpus seja humano, "
+        "diverso e rastreavel."
     )
     st.markdown("---")
 
+    # ── Modulo I ─────────────────────────────────────────────────────────────
     st.markdown("#### Modulo I — Filtro de Entrada (Contamination Score)")
     st.markdown(
-        "Calcula um score **S ∈ [0, 1]** por registro combinando **5 estrategias estatisticas** "
-        "em ensemble ponderado. Score >= limiar (padrao 0.22) = sintetico."
+        "Cada texto recebe um score **S ∈ [0, 1]**: quanto mais proximo de 1, maior a chance de "
+        "ser sintetico. O score e calculado por 5 estrategias independentes, cada uma capturando "
+        "um aspecto diferente do 'jeitao' de LLMs, combinadas em ensemble ponderado."
     )
+
     st.markdown("**Score final ponderado:**")
     st.latex(r"S = 0.35\,m + 0.20\,u + 0.18\,c + 0.15\,e + 0.12\,b")
-    st.markdown("""
-| Componente | Peso | Logica |
-|---|---|---|
-| **m** — Marcadores LLM | 35% | Conta expressoes tipicas: "em suma", "furthermore", "e importante ressaltar"... |
-| **u** — Uniformidade de sentencas | 20% | LLMs geram sentencas mais uniformes em comprimento |
-| **c** — Comprimento de palavras | 18% | Vocabulario LLM e mais formal e longo |
-| **e** — Estrutura de paragrafo | 15% | Detecta aberturas e conclusoes formulaicas via regex |
-| **b** — Entropia de bigramas | 12% | LLMs repetem combinacoes de palavras com mais frequencia |
-""")
-    st.markdown("**Uniformidade de sentencas** — coeficiente de variacao dos comprimentos:")
-    st.latex(r"CV = \frac{\sigma_\ell}{\mu_\ell}; \qquad \text{score}_u = \max\!\left(0,\; 1 - \frac{CV}{0.5}\right)")
-    st.markdown("**Comprimento medio das palavras:**")
-    st.latex(r"\text{score}_c = \frac{\bar\ell - 4.5}{3.5}, \quad \bar\ell = \frac{1}{n}\sum_{i=1}^{n} |w_i|")
-    st.markdown("**Entropia de bigramas de Shannon:**")
-    st.latex(r"H = -\sum_{b} p(b)\,\log_2 p(b); \qquad \text{score}_b = 1 - \frac{H}{H_{max}}")
-    st.info("Limiar padrao: 0.22 — humanos max=0.18, sinteticos min=0.23, gap de seguranca = 0.05.")
+    st.caption(
+        "m = marcadores LLM · u = uniformidade de sentencas · c = comprimento de palavras "
+        "· e = estrutura de paragrafo · b = entropia de bigramas. "
+        "Os pesos refletem a forca discriminativa de cada estrategia no dataset de calibracao."
+    )
+
+    st.markdown("---")
+    st.markdown("**Estrategia 1 — Marcadores LLM (peso 35%)**")
+    st.markdown(
+        "LLMs usam expressoes de transicao de forma muito mais frequente que humanos: "
+        "'em suma', 'e importante ressaltar', 'furthermore', 'it is worth noting'. "
+        "O CO-IA conta quantas dessas expressoes aparecem no texto e normaliza para [0, 1]. "
+        "Tres ou mais ocorrencias ja dao score maximo."
+    )
+    st.latex(r"m = \min\!\left(\frac{\text{hits}}{3},\; 1.0\right)")
+
+    st.markdown("**Estrategia 2 — Uniformidade de Sentencas (peso 20%)**")
+    st.markdown(
+        "Textos humanos variam naturalmente o comprimento das sentencas — umas curtas, outras longas. "
+        "LLMs tendem a gerar sentencas de comprimento mais uniforme. O CO-IA mede o "
+        "coeficiente de variacao (CV = desvio/media) dos comprimentos: quanto menor o CV, "
+        "mais uniforme e o texto e maior o score."
+    )
+    st.latex(r"CV = \frac{\sigma_\ell}{\mu_\ell}; \qquad u = \max\!\left(0,\; 1 - \frac{CV}{0.5}\right)")
+    st.caption("CV proximo de 0 = sentencas muito uniformes = mais provavel sintetico.")
+
+    st.markdown("**Estrategia 3 — Comprimento Medio das Palavras (peso 18%)**")
+    st.markdown(
+        "O vocabulario de LLMs tende a ser mais formal e tecnico, usando palavras mais longas. "
+        "O CO-IA calcula a media de caracteres por palavra e mapeia para [0, 1]: "
+        "abaixo de 4.5 caracteres o score e zero (vocabulario informal/humano); "
+        "acima de 8 caracteres o score e maximo."
+    )
+    st.latex(r"c = \frac{\bar\ell - 4.5}{3.5}, \quad \bar\ell = \frac{1}{n}\sum_{i=1}^{n}|w_i|")
+
+    st.markdown("**Estrategia 4 — Estrutura de Paragrafo (peso 15%)**")
+    st.markdown(
+        "LLMs seguem estruturas formulaicas: comecam paragrafos com 'Primeiramente', 'Alem disso', "
+        "'Por fim' e encerram com 'Em conclusao', 'Portanto'. O CO-IA detecta esses padroes "
+        "via expressao regular e calcula a proporcao de paragrafos afetados."
+    )
+
+    st.markdown("**Estrategia 5 — Entropia de Bigramas (peso 12%)**")
+    st.markdown(
+        "A entropia de Shannon mede a diversidade de pares de palavras consecutivos (bigramas). "
+        "Textos humanos combinam palavras de forma mais imprevisivel (alta entropia). "
+        "LLMs repetem mais os mesmos bigramas (baixa entropia). "
+        "O CO-IA inverte a entropia para que baixa diversidade = score alto."
+    )
+    st.latex(r"H = -\sum_{b} p(b)\,\log_2 p(b); \qquad b = 1 - \frac{H}{H_{max}}")
+    st.caption("H_max = log2(total de bigramas). Score proximo de 1 = corpus pouco diverso = sintetico.")
+
+    st.info(
+        "Limiar padrao: **0.22** — calibrado no dataset demo. "
+        "Humanos ficam abaixo de 0.18; sinteticos acima de 0.23. "
+        "Gap de 0.05 garante separacao clara entre as classes."
+    )
     st.markdown("---")
 
+    # ── Modulo II ────────────────────────────────────────────────────────────
     st.markdown("#### Modulo II — Monitoramento de Degeneracao")
-    st.markdown("Mede a diversidade do corpus e simula N geracoes de treinamento recursivo para antecipar o Model Collapse.")
-    st.markdown("**Entropia de Shannon sobre bigramas** (saudavel > 5.0 bits):")
+    st.markdown(
+        "Nao basta filtrar uma vez: o CO-IA acompanha a saude do corpus ao longo do tempo "
+        "e simula o que aconteceria se o modelo fosse treinado recursivamente por N geracoes "
+        "sem curadoria. Tres metricas de diversidade sao monitoradas."
+    )
+
+    st.markdown("**Entropia de Shannon sobre bigramas** — saudavel acima de 5.0 bits:")
     st.latex(r"H_{bigr} = -\sum_{b} p(b)\,\log_2 p(b)")
-    st.markdown("**Type-Token Ratio — TTR** (saudavel > 0.35):")
+    st.caption(
+        "Aplicada ao corpus inteiro, mede o quanto as combinacoes de palavras sao variaveis. "
+        "A queda dessa metrica ao longo das geracoes e o sinal mais precoce de Model Collapse."
+    )
+
+    st.markdown("**Type-Token Ratio (TTR)** — saudavel acima de 0.35:")
     st.latex(r"TTR = \frac{|V|}{|T|}")
-    st.markdown("onde |V| = vocabulario unico, |T| = total de tokens.")
+    st.caption(
+        "|V| = vocabulario unico (types), |T| = total de tokens. "
+        "TTR baixo significa que o corpus repete muito as mesmas palavras — sinal de degeneracao."
+    )
+
     st.markdown("**MATTR — Moving Average TTR** (janela w = 100 tokens):")
     st.latex(r"MATTR = \frac{1}{n-w+1}\sum_{i=1}^{n-w+1} TTR_i")
-    st.markdown("**Risco de colapso** — media normalizada das metricas:")
+    st.caption(
+        "O TTR simples cai naturalmente em textos longos. O MATTR corrige isso calculando "
+        "o TTR em janelas deslizantes de 100 tokens — muito mais estavel e comparavel entre corpora."
+    )
+
+    st.markdown("**Risco de colapso** — media das metricas normalizadas:")
     st.latex(r"R = \frac{1}{3}\!\left(1-\hat{H} + 1-\widehat{TTR} + 1-\widehat{MATTR}\right)")
-    st.markdown("Zonas: Seguro (R < 30%), Atencao (30-55%), Critico (>75%).")
+    st.caption(
+        "Cada metrica e normalizada para [0,1]. R proximo de 0 = corpus saudavel. "
+        "Zonas: Seguro (R < 30%), Atencao (30-55%), Critico (>75%)."
+    )
     st.markdown("---")
 
+    # ── Modulo III ───────────────────────────────────────────────────────────
     st.markdown("#### Modulo III — Auditoria de Provenencia")
-    st.markdown("**Hash SHA-256 por registro** — rastreabilidade e deteccao de adulteracao:")
-    st.latex(r"h_i = \mathrm{SHA256}(\mathrm{texto}_i)")
     st.markdown(
-        "**Padrao-ouro (Gold Standard):** subconjunto de registros humanos verificados e "
-        "protegidos contra Data Poisoning. **Minimo recomendado: 30% do corpus.**"
+        "Mesmo apos filtrar, e preciso saber de onde vem cada dado. "
+        "O Modulo III gera uma 'impressao digital' criptografica de cada registro, "
+        "protege um conjunto de referencia confiavel (padrao-ouro) e recomenda "
+        "o reequilibrio do corpus para manter proporcoes saudaveis."
     )
+
+    st.markdown("**Hash SHA-256 por registro:**")
+    st.latex(r"h_i = \mathrm{SHA256}(\mathrm{texto}_i)")
+    st.caption(
+        "Qualquer alteracao no texto — mesmo um espaco — muda completamente o hash. "
+        "Isso garante rastreabilidade e detecta adulteracao pos-curadoria (Data Poisoning)."
+    )
+
+    st.markdown("**Padrao-ouro (Gold Standard):**")
     st.latex(r"p_{gold} = \frac{n_{gold}}{n_{total}} \;\geq\; 0.30")
-    st.markdown("**Limite de registros sinteticos:** maximo 50% do corpus para equilibrio saudavel.")
+    st.caption(
+        "O padrao-ouro e o subconjunto de registros humanos verificados manualmente. "
+        "Com pelo menos 30% do corpus nessa categoria, o modelo tem uma ancora confiavel "
+        "contra a deriva causada por dados sinteticos."
+    )
+
+    st.markdown("**Limite de sinteticos:**")
     st.latex(r"p_{sint} = \frac{n_{sint}}{n_{total}} \;\leq\; 0.50")
+    st.caption(
+        "Acima de 50% de dados sinteticos, o risco de Model Collapse aumenta drasticamente. "
+        "O CO-IA alerta e recomenda a remocao ou substituicao de registros para manter o equilibrio."
+    )
 
 
 
@@ -247,12 +338,6 @@ def render_patents():
     st.markdown(
         "**71 patentes** mapeadas sistematicamente (49 Derwent Innovation + 22 INPI) como base "
         "tecnica e cientifica do CO-IA — MCT, UNIRIO/BSI, 2025."
-    )
-    st.markdown(
-        "> **Nota sobre status:** patentes publicadas com sufixo **-A1** sao pedidos publicados "
-        "(nao concedidos formalmente ainda), mas constituem **prior art** publico e sao plenamente "
-        "citaveis em trabalhos academicos e registros de software. Patentes com sufixo **-B1/B2** "
-        "sao concedidas. Para fins de MCT, todas as listadas abaixo sao utilizaveis como referencia."
     )
     st.markdown("---")
 
