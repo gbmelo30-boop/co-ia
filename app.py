@@ -51,16 +51,30 @@ st.markdown("""
         font-family: 'Inter', system-ui, -apple-system, sans-serif;
     }
 
-    /* Botao de sidebar (chevron) — sempre visivel e destacado */
+    /* Botao de sidebar quando FECHADA — bem destacado */
     [data-testid="collapsedControl"] {
         display: flex !important;
         visibility: visible !important;
-        background: #1e3a52 !important;
-        border-radius: 0 6px 6px 0 !important;
-        padding: 6px 4px !important;
-        margin-top: 12px !important;
+        opacity: 1 !important;
+        background: #1e4a6e !important;
+        border-radius: 0 10px 10px 0 !important;
+        padding: 12px 10px !important;
+        margin-top: 20px !important;
+        box-shadow: 3px 0 12px rgba(0,0,0,0.5) !important;
+        z-index: 9999 !important;
+        border: 1px solid #2a6a9a !important;
+        border-left: none !important;
     }
-    [data-testid="collapsedControl"] svg { color: #7ab8e0 !important; fill: #7ab8e0 !important; }
+    [data-testid="collapsedControl"] svg {
+        color: #7ab8e0 !important;
+        fill: #7ab8e0 !important;
+        width: 20px !important;
+        height: 20px !important;
+    }
+    /* Botao de fechar dentro da sidebar */
+    [data-testid="stSidebarCollapseButton"] button {
+        color: #7ab8e0 !important;
+    }
 
     /* Header principal */
     .coia-header {
