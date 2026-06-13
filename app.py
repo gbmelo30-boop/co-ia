@@ -140,6 +140,23 @@ st.markdown("""
     /* Captions */
     [data-testid="stCaptionContainer"] p { color: #8aafc8 !important; }
 
+    /* Dialog / Modal — texto sempre claro */
+    div[role="dialog"] p,
+    div[role="dialog"] li,
+    div[role="dialog"] span,
+    div[role="dialog"] label,
+    div[role="dialog"] .stMarkdown p,
+    div[role="dialog"] .stMarkdown li { color: #d0dce8 !important; }
+    div[role="dialog"] strong          { color: #e8edf2 !important; }
+    div[role="dialog"] em              { color: #b0c8e0 !important; }
+    div[role="dialog"] [data-testid="stCaptionContainer"] p { color: #8aafc8 !important; }
+    div[role="dialog"] table td,
+    div[role="dialog"] table th        { color: #d0dce8 !important; }
+    div[role="dialog"] code            { color: #7ecfb3 !important; }
+    /* Fundo do modal */
+    div[role="dialog"] > div[data-testid="stModal"] { background: #0f1923 !important; }
+    div[data-testid="stModalContent"]  { background: #0f1923 !important; }
+
     /* Padding principal */
     .block-container { padding-top: 1.2rem !important; }
 
@@ -431,7 +448,7 @@ def render_sidebar():
         st.markdown("### Dados de Entrada")
         fonte = st.radio(
             "Fonte dos dados:",
-            ["Dataset de Demonstracao", "Upload CSV/JSONL"],
+            ["Dataset de Demonstracao", "Carregar arquivo (CSV / JSONL / Excel / Word)"],
             index=0,
             label_visibility="collapsed",
         )
@@ -452,7 +469,7 @@ def render_sidebar():
             arquivo = st.file_uploader(
                 "Arquivo:",
                 type=["csv", "jsonl", "xlsx", "docx"],
-                help="CSV/JSONL com coluna 'texto'. Excel (.xlsx) com coluna 'texto'. Word (.docx): cada paragrafo vira um registro.",
+                help="Formatos aceitos: CSV (.csv), JSONL (.jsonl), Excel (.xlsx), Word (.docx). Todos precisam ter (ou serao mapeados para) a coluna 'texto'.",
                 label_visibility="collapsed",
             )
             if arquivo:
@@ -629,7 +646,16 @@ def render_modulo1(df: pd.DataFrame, limiar: float):
     colunas = [c for c in colunas if c in df_resultado.columns]
     st.dataframe(df_resultado[colunas], use_container_width=True, height=380)
 
-    st.session_state["df_m1"] = df_resultado
+    st.session_state["df_m1"]       = df_resultado
+    st.session_state["metricas_m1"] = {
+        "total_registros":   total,
+        "n_humanos":         n_hum,
+        "n_sinteticos":      n_sint,
+        "taxa_contaminacao": round(n_sint / total * 100, 1) if total > 0 else 0.0,
+        "score_medio":       score_med,
+        "score_max":         round(df_resultado["score_contaminacao"].max(), 3),
+        "score_min":         round(df_resultado["score_contaminacao"].min(), 3),
+    }
     return df_resultado
 
 
