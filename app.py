@@ -153,8 +153,40 @@ st.markdown("""
         .cards-row { flex-direction: column; }
         .block-container { padding-left: 0.5rem !important; padding-right: 0.5rem !important; }
     }
+
+    /* Botao flutuante de menu — sempre visivel */
+    #coia-menu-btn {
+        position: fixed;
+        left: 0;
+        top: 50%;
+        transform: translateY(-50%);
+        z-index: 99999;
+        background: #1e4a6e;
+        border: 1px solid #2a6a9a;
+        border-left: none;
+        border-radius: 0 10px 10px 0;
+        padding: 14px 10px;
+        cursor: pointer;
+        box-shadow: 3px 0 14px rgba(0,0,0,0.55);
+        display: flex;
+        flex-direction: column;
+        gap: 5px;
+        align-items: center;
+        transition: background 0.2s;
+    }
+    #coia-menu-btn:hover { background: #2a5f8a; }
+    #coia-menu-btn span {
+        display: block;
+        width: 18px;
+        height: 2px;
+        background: #7ab8e0;
+        border-radius: 2px;
+    }
+    #coia-menu-btn.hidden { display: none; }
 </style>
 """, unsafe_allow_html=True)
+
+
 
 
 # =============================================================================
@@ -344,9 +376,8 @@ def render_sidebar():
 def render_home(df: pd.DataFrame):
     st.markdown("""
     <div class="coia-header">
-        <h1>CO-IA — Curadoria de Origem para IA</h1>
+        <h1>CO-IA &mdash; Curadoria de Origem para IA</h1>
         <p class="subtitle">Pipeline de deteccao, monitoramento e provenencia para mitigacao do Model Collapse</p>
-        <p class="meta">UNIRIO / BSI &nbsp;&middot;&nbsp; Metodologia Cientifica e Tecnologica &nbsp;&middot;&nbsp; 2025 &nbsp;&middot;&nbsp; 71 patentes + 244 estudos cientificos</p>
     </div>
     """, unsafe_allow_html=True)
 
@@ -689,6 +720,36 @@ def main():
         render_patents()
 
     df_input, limiar, n_geracoes = render_sidebar()
+
+    # Botao flutuante para reabrir a sidebar
+    st.markdown("""
+<div id="coia-menu-btn" title="Abrir menu lateral">
+  <span></span><span></span><span></span>
+</div>
+<script>
+(function() {
+  function clickSidebarToggle() {
+    var collapsed = document.querySelector('[data-testid="collapsedControl"]');
+    if (collapsed) { collapsed.click(); return; }
+    var closeBtn = document.querySelector('[data-testid="stSidebarCollapseButton"] button');
+    if (closeBtn) { closeBtn.click(); return; }
+  }
+  function syncVisibility() {
+    var btn = document.getElementById('coia-menu-btn');
+    if (!btn) return;
+    var sidebar = document.querySelector('[data-testid="stSidebar"]');
+    if (sidebar) {
+      btn.style.display = sidebar.getBoundingClientRect().width > 50 ? 'none' : 'flex';
+    }
+  }
+  setTimeout(function() {
+    var btn = document.getElementById('coia-menu-btn');
+    if (btn) btn.addEventListener('click', clickSidebarToggle);
+    setInterval(syncVisibility, 400);
+  }, 200);
+})();
+</script>
+""", unsafe_allow_html=True)
 
     if df_input is None:
         st.markdown("""
