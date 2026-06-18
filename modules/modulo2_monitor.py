@@ -1,5 +1,5 @@
 # =============================================================================
-# CO-IA — Módulo II: Monitoramento de Degeneração
+# PROVYN — Módulo II: Monitoramento de Degeneração
 # modulo2_monitor.py
 #
 # Calcula métricas de diversidade do corpus, estima o risco de colapso de modelo
@@ -140,12 +140,12 @@ class CorpusMetrics:
 
     def proporcao_sinteticos(self, df: pd.DataFrame) -> float:
         """Calcula proporção de registros classificados como sintéticos."""
-        if "classificacao_coia" not in df.columns:
+        if "classificacao_provyn" not in df.columns:
             return 0.0
         total = len(df)
         if total == 0:
             return 0.0
-        n_sinteticos = (df["classificacao_coia"] == "sintético").sum()
+        n_sinteticos = (df["classificacao_provyn"] == "sintético").sum()
         return n_sinteticos / total
 
     # ------------------------------------------------------------------
@@ -241,19 +241,19 @@ class CollapseRiskEvaluator:
 # =============================================================================
 # GenerationSimulator — simula N gerações de treinamento recursivo
 # Ref: US2025094459-A1 (Madisetti) — degradação por feedback loop
-#      US2025342187-A1              — comparação com e sem curadoria (CO-IA)
+#      US2025342187-A1              — comparação com e sem curadoria (PROVYN)
 # =============================================================================
 
 class GenerationSimulator:
     """
     Simula como o corpus se degrada ao longo de N gerações de treinamento
-    recursivo — com e sem o pipeline CO-IA ativo.
+    recursivo — com e sem o pipeline PROVYN ativo.
 
-    A degradação sem CO-IA segue curvas empíricas documentadas em
+    A degradação sem PROVYN segue curvas empíricas documentadas em
     US2025094459-A1 (Madisetti) e na literatura de Model Collapse
     (Shumailov et al., 2024; Briesch et al., 2023).
 
-    Com CO-IA ativo, a curadoria preserva as métricas acima dos limiares mínimos.
+    Com PROVYN ativo, a curadoria preserva as métricas acima dos limiares mínimos.
     """
 
     def __init__(self, metricas_iniciais: Dict[str, float]):
@@ -262,7 +262,7 @@ class GenerationSimulator:
     def simular(
         self,
         n_geracoes: int = DEFAULT_GENERATIONS,
-        coia_ativo: bool = False,
+        provyn_ativo: bool = False,
     ) -> List[Dict]:
         """
         Retorna lista de dicionários com métricas por geração.
@@ -295,22 +295,22 @@ class GenerationSimulator:
                 "prop_sinteticos":   metricas_gen["proporcao_sinteticos"],
                 "risco_colapso":     risco_info["risco_total"],
                 "zona":              risco_info["zona"],
-                "coia_ativo":        coia_ativo,
+                "provyn_ativo":        provyn_ativo,
             })
 
             if gen == n_geracoes:
                 break
 
             # ── Aplicar degradação para próxima geração ──────────────────
-            if not coia_ativo:
-                # SEM CO-IA: degradação agressiva (US2025094459-A1)
+            if not provyn_ativo:
+                # SEM PROVYN: degradação agressiva (US2025094459-A1)
                 fator_ruido = random.uniform(0.02, 0.05)
                 entropia_atual  *= (1 - random.uniform(0.08, 0.15))
                 ttr_atual       *= (1 - random.uniform(0.06, 0.12))
                 mattr_atual     *= (1 - random.uniform(0.05, 0.10))
                 prop_sint        = min(prop_sint + random.uniform(0.05, 0.12), 0.98)
             else:
-                # COM CO-IA: degradação mitigada (CO-IA preserva diversidade)
+                # COM PROVYN: degradação mitigada (PROVYN preserva diversidade)
                 # Leve queda natural, mas curadoria mantém acima dos mínimos
                 entropia_atual  *= (1 - random.uniform(0.01, 0.03))
                 ttr_atual       *= (1 - random.uniform(0.01, 0.02))
@@ -319,7 +319,7 @@ class GenerationSimulator:
                     prop_sint + random.uniform(-0.02, 0.03),
                     0.0
                 )
-                # Garantir mínimos saudáveis (ação do CO-IA)
+                # Garantir mínimos saudáveis (ação do PROVYN)
                 entropia_atual  = max(entropia_atual, ENTROPY_HEALTHY_MIN * 0.90)
                 ttr_atual       = max(ttr_atual, TTR_HEALTHY_MIN * 0.90)
                 mattr_atual     = max(mattr_atual, TTR_HEALTHY_MIN * 0.85)
@@ -338,15 +338,15 @@ class GenerationSimulator:
         Roda a simulação para os dois cenários e retorna DataFrame comparativo.
         """
         random.seed(42)  # reproducibilidade para a demo
-        sem_coia = self.simular(n_geracoes, coia_ativo=False)
+        sem_provyn = self.simular(n_geracoes, provyn_ativo=False)
         random.seed(42)
-        com_coia = self.simular(n_geracoes, coia_ativo=True)
+        com_provyn = self.simular(n_geracoes, provyn_ativo=True)
 
-        df_sem = pd.DataFrame(sem_coia)
-        df_com = pd.DataFrame(com_coia)
+        df_sem = pd.DataFrame(sem_provyn)
+        df_com = pd.DataFrame(com_provyn)
 
-        df_sem["cenario"] = "Sem CO-IA"
-        df_com["cenario"] = "Com CO-IA"
+        df_sem["cenario"] = "Sem PROVYN"
+        df_com["cenario"] = "Com PROVYN"
 
         return pd.concat([df_sem, df_com], ignore_index=True)
 

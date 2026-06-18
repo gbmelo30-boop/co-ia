@@ -1,5 +1,5 @@
 # =============================================================================
-# CO-IA — Curadoria de Origem para IA
+# PROVYN — Curadoria de Origem para IA
 # app.py — Dashboard principal (Streamlit)
 # =============================================================================
 
@@ -35,7 +35,7 @@ from modules.modulo3_provenance import ReportBuilder, gerar_proveniencia
 # =============================================================================
 
 st.set_page_config(
-    page_title="CO-IA",
+    page_title="PROVYN",
     layout="wide",
     initial_sidebar_state="expanded",
 )
@@ -78,22 +78,22 @@ st.markdown("""
     }
 
     /* Header principal */
-    .coia-header {
+    .provyn-header {
         background: linear-gradient(135deg, #0f1923 0%, #152032 60%, #0d2137 100%);
         padding: 1.8rem 2.2rem 1.5rem;
         border-radius: 10px;
         margin-bottom: 1.2rem;
         border: 1px solid #1e3a52;
     }
-    .coia-header h1 {
+    .provyn-header h1 {
         color: #e8edf2;
         margin: 0 0 0.3rem 0;
         font-size: 1.6rem;
         font-weight: 700;
         letter-spacing: -0.3px;
     }
-    .coia-header .subtitle { color: #7a9ab5; font-size: 0.87rem; margin: 0; }
-    .coia-header .meta     { color: #4a6a85; font-size: 0.75rem; margin-top: 0.5rem; }
+    .provyn-header .subtitle { color: #7a9ab5; font-size: 0.87rem; margin: 0; }
+    .provyn-header .meta     { color: #4a6a85; font-size: 0.75rem; margin-top: 0.5rem; }
 
     /* Cards de modulo — alinhados com flexbox */
     .cards-row {
@@ -166,8 +166,8 @@ st.markdown("""
 
     /* Responsividade */
     @media (max-width: 768px) {
-        .coia-header { padding: 1rem; }
-        .coia-header h1 { font-size: 1.15rem; }
+        .provyn-header { padding: 1rem; }
+        .provyn-header h1 { font-size: 1.15rem; }
         .cards-row { flex-direction: column; }
         .block-container { padding-left: 0.5rem !important; padding-right: 0.5rem !important; }
     }
@@ -182,14 +182,14 @@ st.markdown("""
 # Dialogs (modais)
 # =============================================================================
 
-@st.dialog("CO-IA — Como funciona", width="large")
+@st.dialog("PROVYN — Como funciona", width="large")
 def render_about():
     st.markdown("""<style>
     section[data-testid="stModal"] > div { max-height: 80vh; overflow-y: auto; padding-right: 6px; }
     </style>""", unsafe_allow_html=True)
 
     st.markdown(
-        "**CO-IA** detecta textos gerados por IA em um corpus de treinamento e protege modelos "
+        "**PROVYN** detecta textos gerados por IA em um corpus de treinamento e protege modelos "
         "de IA Generativa contra o *Model Collapse* — a degradacao progressiva causada por "
         "treinamento recursivo sobre dados sinteticos."
     )
@@ -202,7 +202,7 @@ def render_about():
         "a distribuicao estatistica do corpus se estreita a cada geracao. A 'cauda longa' das "
         "distribuicoes originais desaparece, levando a perda de diversidade e acuracia. "
         "**Shumailov et al. (2024, Nature)** demonstraram que esse processo e inevitavel sem curadoria ativa. "
-        "O CO-IA atua exatamente nesse ponto: antes de treinar, garantindo que o corpus seja humano, "
+        "O PROVYN atua exatamente nesse ponto: antes de treinar, garantindo que o corpus seja humano, "
         "diverso e rastreavel."
     )
     st.markdown("---")
@@ -228,7 +228,7 @@ def render_about():
     st.markdown(
         "LLMs usam expressoes de transicao de forma muito mais frequente que humanos: "
         "'em suma', 'e importante ressaltar', 'furthermore', 'it is worth noting'. "
-        "O CO-IA conta quantas dessas expressoes aparecem no texto e normaliza para [0, 1]. "
+        "O PROVYN conta quantas dessas expressoes aparecem no texto e normaliza para [0, 1]. "
         "Tres ou mais ocorrencias ja dao score maximo."
     )
     st.latex(r"m = \min\!\left(\frac{\text{hits}}{3},\; 1.0\right)")
@@ -236,7 +236,7 @@ def render_about():
     st.markdown("**Estrategia 2 — Uniformidade de Sentencas (peso 20%)**")
     st.markdown(
         "Textos humanos variam naturalmente o comprimento das sentencas — umas curtas, outras longas. "
-        "LLMs tendem a gerar sentencas de comprimento mais uniforme. O CO-IA mede o "
+        "LLMs tendem a gerar sentencas de comprimento mais uniforme. O PROVYN mede o "
         "coeficiente de variacao (CV = desvio/media) dos comprimentos: quanto menor o CV, "
         "mais uniforme e o texto e maior o score."
     )
@@ -246,7 +246,7 @@ def render_about():
     st.markdown("**Estrategia 3 — Comprimento Medio das Palavras (peso 18%)**")
     st.markdown(
         "O vocabulario de LLMs tende a ser mais formal e tecnico, usando palavras mais longas. "
-        "O CO-IA calcula a media de caracteres por palavra e mapeia para [0, 1]: "
+        "O PROVYN calcula a media de caracteres por palavra e mapeia para [0, 1]: "
         "abaixo de 4.5 caracteres o score e zero (vocabulario informal/humano); "
         "acima de 8 caracteres o score e maximo."
     )
@@ -255,7 +255,7 @@ def render_about():
     st.markdown("**Estrategia 4 — Estrutura de Paragrafo (peso 15%)**")
     st.markdown(
         "LLMs seguem estruturas formulaicas: comecam paragrafos com 'Primeiramente', 'Alem disso', "
-        "'Por fim' e encerram com 'Em conclusao', 'Portanto'. O CO-IA detecta esses padroes "
+        "'Por fim' e encerram com 'Em conclusao', 'Portanto'. O PROVYN detecta esses padroes "
         "via expressao regular e calcula a proporcao de paragrafos afetados."
     )
 
@@ -264,7 +264,7 @@ def render_about():
         "A entropia de Shannon mede a diversidade de pares de palavras consecutivos (bigramas). "
         "Textos humanos combinam palavras de forma mais imprevisivel (alta entropia). "
         "LLMs repetem mais os mesmos bigramas (baixa entropia). "
-        "O CO-IA inverte a entropia para que baixa diversidade = score alto."
+        "O PROVYN inverte a entropia para que baixa diversidade = score alto."
     )
     st.latex(r"H = -\sum_{b} p(b)\,\log_2 p(b); \qquad b = 1 - \frac{H}{H_{max}}")
     st.caption("H_max = log2(total de bigramas). Score proximo de 1 = corpus pouco diverso = sintetico.")
@@ -279,7 +279,7 @@ def render_about():
     # ── Modulo II ────────────────────────────────────────────────────────────
     st.markdown("#### Modulo II — Monitoramento de Degeneracao")
     st.markdown(
-        "Nao basta filtrar uma vez: o CO-IA acompanha a saude do corpus ao longo do tempo "
+        "Nao basta filtrar uma vez: o PROVYN acompanha a saude do corpus ao longo do tempo "
         "e simula o que aconteceria se o modelo fosse treinado recursivamente por N geracoes "
         "sem curadoria. Tres metricas de diversidade sao monitoradas."
     )
@@ -341,12 +341,12 @@ def render_about():
     st.latex(r"p_{sint} = \frac{n_{sint}}{n_{total}} \;\leq\; 0.50")
     st.caption(
         "Acima de 50% de dados sinteticos, o risco de Model Collapse aumenta drasticamente. "
-        "O CO-IA alerta e recomenda a remocao ou substituicao de registros para manter o equilibrio."
+        "O PROVYN alerta e recomenda a remocao ou substituicao de registros para manter o equilibrio."
     )
 
 
 
-@st.dialog("DNA Tecnico do CO-IA — Base Patentaria", width="large")
+@st.dialog("DNA Tecnico do PROVYN — Base Patentaria", width="large")
 def render_patents():
     st.markdown("""<style>
     section[data-testid="stModal"] > div { max-height: 80vh; overflow-y: auto; padding-right: 6px; }
@@ -354,7 +354,7 @@ def render_patents():
 
     st.markdown(
         "**71 patentes** mapeadas sistematicamente (49 Derwent Innovation + 22 INPI) como base "
-        "tecnica e cientifica do CO-IA — MCT, UNIRIO/BSI, 2025."
+        "tecnica e cientifica do PROVYN — MCT, UNIRIO/BSI, 2025."
     )
     st.markdown("---")
 
@@ -441,7 +441,7 @@ def render_patents():
 
 def render_sidebar():
     with st.sidebar:
-        st.markdown("### CO-IA")
+        st.markdown("### PROVYN")
         st.markdown("Curadoria de Origem para IA")
         st.markdown("---")
 
@@ -539,8 +539,8 @@ def render_sidebar():
 
 def render_home(df: pd.DataFrame):
     st.markdown("""
-    <div class="coia-header">
-        <h1>CO-IA &mdash; Curadoria de Origem para IA</h1>
+    <div class="provyn-header">
+        <h1>PROVYN &mdash; Curadoria de Origem para IA</h1>
         <p class="subtitle">Pipeline de deteccao, monitoramento e provenencia para mitigacao do Model Collapse</p>
     </div>
     """, unsafe_allow_html=True)
@@ -589,7 +589,7 @@ def render_modulo1(df: pd.DataFrame, limiar: float):
         df_resultado = engine.analisar_dataset(df)
 
     total      = len(df_resultado)
-    n_sint     = int((df_resultado["classificacao_coia"] == "sintetico").sum())
+    n_sint     = int((df_resultado["classificacao_provyn"] == "sintetico").sum())
     n_hum      = total - n_sint
     score_med  = round(df_resultado["score_contaminacao"].mean(), 3)
 
@@ -601,16 +601,16 @@ def render_modulo1(df: pd.DataFrame, limiar: float):
 
     if "tipo_real" in df_resultado.columns:
         df_resultado["correto"] = df_resultado.apply(
-            lambda r: r["classificacao_coia"] == r["tipo_real"] or
-                      (r["classificacao_coia"] == "sintetico" and r["tipo_real"] == "sintetico"), axis=1)
+            lambda r: r["classificacao_provyn"] == r["tipo_real"] or
+                      (r["classificacao_provyn"] == "sintetico" and r["tipo_real"] == "sintetico"), axis=1)
         acc = df_resultado["correto"].mean() * 100
         st.metric("Acuracia vs rotulo real", f"{acc:.1f}%")
 
     st.markdown("#### Distribuicao do Contamination Score")
     fig_hist = px.histogram(
-        df_resultado, x="score_contaminacao", color="classificacao_coia", nbins=20,
+        df_resultado, x="score_contaminacao", color="classificacao_provyn", nbins=20,
         color_discrete_map={"humano": COLOR_HUMANO, "sintetico": COLOR_SINTETICO},
-        labels={"score_contaminacao": "Contamination Score", "classificacao_coia": "Classificacao CO-IA"},
+        labels={"score_contaminacao": "Contamination Score", "classificacao_provyn": "Classificacao PROVYN"},
     )
     fig_hist.add_vline(x=limiar, line_dash="dash", line_color="#1E88E5",
                        annotation_text=f"Limiar ({limiar})", annotation_position="top right")
@@ -621,7 +621,7 @@ def render_modulo1(df: pd.DataFrame, limiar: float):
     score_cols = [c for c in df_resultado.columns if c.startswith("score_") and c != "score_contaminacao"]
     if score_cols:
         st.markdown("#### Perfil por estrategia")
-        medias = df_resultado.groupby("classificacao_coia")[score_cols].mean().reset_index()
+        medias = df_resultado.groupby("classificacao_provyn")[score_cols].mean().reset_index()
         estrategias = [c.replace("score_", "").replace("_", " ").title() for c in score_cols]
         fig_radar = go.Figure()
         for _, row in medias.iterrows():
@@ -630,8 +630,8 @@ def render_modulo1(df: pd.DataFrame, limiar: float):
                 r=valores,
                 theta=estrategias + [estrategias[0]],
                 fill="toself",
-                name=row["classificacao_coia"],
-                line_color=COLOR_HUMANO if row["classificacao_coia"] == "humano" else COLOR_SINTETICO,
+                name=row["classificacao_provyn"],
+                line_color=COLOR_HUMANO if row["classificacao_provyn"] == "humano" else COLOR_SINTETICO,
                 opacity=0.7,
             ))
         fig_radar.update_layout(
@@ -642,7 +642,7 @@ def render_modulo1(df: pd.DataFrame, limiar: float):
         st.plotly_chart(fig_radar, use_container_width=True)
 
     st.markdown("#### Tabela de resultados")
-    colunas = ["id", "texto", "score_contaminacao", "classificacao_coia"] + score_cols[:3]
+    colunas = ["id", "texto", "score_contaminacao", "classificacao_provyn"] + score_cols[:3]
     colunas = [c for c in colunas if c in df_resultado.columns]
     st.dataframe(df_resultado[colunas], use_container_width=True, height=380)
 
@@ -714,7 +714,7 @@ def render_modulo2(df: pd.DataFrame, n_geracoes: int):
     tab_e, tab_t, tab_r = st.tabs(["Entropia", "TTR", "Risco de Colapso"])
 
     kwargs = dict(x="geracao", color="cenario",
-                  color_discrete_map={"Com CO-IA": COLOR_HUMANO, "Sem CO-IA": COLOR_SINTETICO},
+                  color_discrete_map={"Com PROVYN": COLOR_HUMANO, "Sem PROVYN": COLOR_SINTETICO},
                   markers=True)
     layout_kw = dict(height=300, margin=dict(t=30, b=20),
                      paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)")
@@ -755,14 +755,14 @@ def render_modulo3(df: pd.DataFrame):
     st.caption("Hash SHA-256 por registro, padrao-ouro e recomendacao de reequilibrio do corpus.")
 
     df_m1 = st.session_state.get("df_m1", df)
-    if "classificacao_coia" not in df_m1.columns:
+    if "classificacao_provyn" not in df_m1.columns:
         engine = build_default_engine()
         df_m1  = engine.analisar_dataset(df_m1)
 
     st.markdown("#### Padrao-ouro (Gold Standard)")
     st.caption("Marque os registros humanos verificados. Eles serao protegidos contra Data Poisoning.")
 
-    candidatos = df_m1[df_m1["classificacao_coia"] == "humano"]["id"].tolist() \
+    candidatos = df_m1[df_m1["classificacao_provyn"] == "humano"]["id"].tolist() \
         if "id" in df_m1.columns else []
     ids_gold = st.multiselect(
         "Selecione os IDs para o padrao-ouro:",
@@ -850,12 +850,12 @@ def render_exportacao():
     st.download_button(
         "Baixar relatorio (.md)",
         relatorio.encode("utf-8"),
-        "relatorio_co_ia.md", "text/markdown",
+        "relatorio_provyn.md", "text/markdown",
         use_container_width=True,
     )
 
     st.markdown("#### Resumo para registro INPI/DIT")
-    resumo = f"""Nome: CO-IA — Curadoria de Origem para IA
+    resumo = f"""Nome: PROVYN — Curadoria de Origem para IA
 Versao: {APP_VERSION}
 Linguagem: Python 3.11 | Plataforma: Streamlit
 
@@ -869,7 +869,7 @@ auditoria de provenencia com hashing criptografico SHA-256.
     st.download_button(
         "Baixar resumo INPI (.txt)",
         resumo.encode("utf-8"),
-        "resumo_inpi_co_ia.txt", "text/plain",
+        "resumo_inpi_provyn.txt", "text/plain",
         use_container_width=True,
     )
 
@@ -895,11 +895,11 @@ def main():
 (function() {
   var pd = window.parent ? window.parent.document : document;
   // Remove botao anterior para evitar duplicatas
-  var old = pd.getElementById('coia-fab');
+  var old = pd.getElementById('provyn-fab');
   if (old) old.remove();
   // Cria botao e injeta direto no body do pai
   var btn = pd.createElement('button');
-  btn.id = 'coia-fab';
+  btn.id = 'provyn-fab';
   btn.title = 'Abrir ou fechar menu lateral';
   btn.style.cssText = 'position:fixed;left:0;top:50%;transform:translateY(-50%);z-index:999999;background:#1e4a6e;border:1px solid #2a6a9a;border-left:none;border-radius:0 10px 10px 0;padding:14px 10px;cursor:pointer;box-shadow:3px 0 14px rgba(0,0,0,.55);display:flex;flex-direction:column;gap:5px;align-items:center;transition:background .2s';
   var bar = 'display:block;width:18px;height:2px;background:#7ab8e0;border-radius:2px';
@@ -929,8 +929,8 @@ def main():
 
     if df_input is None:
         st.markdown("""
-        <div class="coia-header">
-            <h1>CO-IA — Curadoria de Origem para IA</h1>
+        <div class="provyn-header">
+            <h1>PROVYN — Curadoria de Origem para IA</h1>
             <p class="subtitle">Selecione o dataset de demonstracao na barra lateral para comecar.</p>
             <p class="meta">Use o botao "Como funciona" na barra lateral para entender o sistema.</p>
         </div>

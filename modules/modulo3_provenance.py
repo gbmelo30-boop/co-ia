@@ -1,5 +1,5 @@
 # =============================================================================
-# CO-IA — Módulo III: Auditoria de Proveniência
+# PROVYN — Módulo III: Auditoria de Proveniência
 # modulo3_provenance.py
 #
 # Registra a origem verificável de cada amostra via hash SHA-256, protege um
@@ -55,7 +55,7 @@ class ProvenanceRecord:
     hash_sha256: str          # SHA-256 do conteúdo textual
     fonte:       str          # Origem declarada (arquivo, URL, autor)
     data_ingestao: str        # Timestamp de ingestão no pipeline
-    tipo_declarado: str       # 'humano' ou 'sintético' (pelo CO-IA)
+    tipo_declarado: str       # 'humano' ou 'sintético' (pelo PROVYN)
     score_contaminacao: float # Score do Módulo I
     is_gold_standard: bool    # Se pertence ao conjunto padrão-ouro protegido
     comprimento_chars: int    # Comprimento do texto em caracteres
@@ -192,7 +192,7 @@ class ProvenanceEngine:
                 hash_sha256=self.gerar_hash(texto),
                 fonte=str(row.get("fonte", "desconhecida")),
                 data_ingestao=timestamp,
-                tipo_declarado=str(row.get("classificacao_coia", row.get("tipo_real", "desconhecido"))),
+                tipo_declarado=str(row.get("classificacao_provyn", row.get("tipo_real", "desconhecido"))),
                 score_contaminacao=float(row.get("score_contaminacao", 0.0)),
                 is_gold_standard=False,
                 comprimento_chars=len(texto),

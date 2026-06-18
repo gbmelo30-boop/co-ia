@@ -1,6 +1,8 @@
-# CO-IA — Curadoria de Origem para IA
+# PROVYN — Curadoria de Origem para IA
 
 > Pipeline integrado de detecção, monitoramento e proveniência para mitigação do Model Collapse em sistemas de IA Generativa.
+
+**Acesse online:** https://provyn-app.streamlit.app
 
 **Autor:** Gabriel de Melo Guedes Souza  
 **Instituição:** UNIRIO — Bacharelado em Sistemas de Informação (BSI)  
@@ -13,9 +15,9 @@
 
 O **Model Collapse** ocorre quando modelos de IA Generativa são treinados recursivamente sobre dados sintéticos gerados por versões anteriores do próprio modelo. O resultado é uma degradação progressiva em acurácia e diversidade — o chamado efeito *"Habsburg AI"* — com perda da "cauda longa" da distribuição dos dados originais.
 
-## A Solução — CO-IA
+## A Solução — PROVYN
 
-O CO-IA é um framework integrado com três módulos complementares, cada um fundamentado em patentes mapeadas sistematicamente:
+O PROVYN é um framework integrado com três módulos complementares, cada um fundamentado em patentes mapeadas sistematicamente:
 
 | Módulo | Função | Patentes de Referência |
 |--------|--------|------------------------|
@@ -31,8 +33,8 @@ O CO-IA é um framework integrado com três módulos complementares, cada um fun
 
 ```bash
 # Clonar o repositório
-git clone https://github.com/gbmelo30-boop/co-ia.git
-cd co-ia
+git clone https://github.com/gbmelo30-boop/provyn.git
+cd provyn
 
 # Instalar dependências
 pip install -r requirements.txt
@@ -48,7 +50,7 @@ Acesse em: `http://localhost:8501`
 ## Estrutura do Projeto
 
 ```
-co-ia/
+provyn/
 ├── app.py                          # Dashboard principal (Streamlit)
 ├── config.py                       # Configurações globais e constantes
 ├── requirements.txt
@@ -77,7 +79,7 @@ co-ia/
 1. Faça fork ou push deste repositório para sua conta GitHub
 2. Acesse [streamlit.io/cloud](https://streamlit.io/cloud)
 3. Clique em **New app** → selecione o repositório → `app.py` → **Deploy**
-4. Aguarde ~2 minutos → URL pública gerada automaticamente
+4. Aguarde ~2 minutos → URL pública gerada automaticamente (sugestão: `provyn-app.streamlit.app`)
 
 ---
 
@@ -90,6 +92,8 @@ S001,"Texto do registro 2","Gerado por LLM","sintetico"
 ```
 
 Somente a coluna `texto` é obrigatória. As demais são opcionais.
+
+Formatos aceitos no upload: **CSV (.csv), JSONL (.jsonl), Excel (.xlsx) e Word (.docx)**. Em arquivos Word, cada parágrafo vira um registro.
 
 ---
 

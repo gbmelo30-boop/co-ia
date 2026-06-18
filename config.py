@@ -1,5 +1,5 @@
 # =============================================================================
-# CO-IA — Curadoria de Origem para IA
+# PROVYN — Curadoria de Origem para IA
 # config.py — Configurações globais e constantes do framework
 #
 # Embasamento: WO2025037142-A1 (NEC Lab), IN202511107978-A (Manipal)
@@ -68,7 +68,7 @@ HASH_ALGORITHM = "sha256"
 # Interface / Dashboard
 # ---------------------------------------------------------------------------
 
-APP_TITLE    = "CO-IA — Curadoria de Origem para IA"
+APP_TITLE    = "PROVYN — Curadoria de Origem para IA"
 APP_SUBTITLE = "Pipeline integrado de detecção, monitoramento e proveniência de dados de treinamento"
 APP_VERSION  = "1.0.0-MVP"
 APP_AUTHOR   = "Gabriel de Melo Guedes Souza — UNIRIO / BSI"

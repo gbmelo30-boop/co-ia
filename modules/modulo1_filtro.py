@@ -1,5 +1,5 @@
 # =============================================================================
-# CO-IA — Curadoria de Origem para IA
+# PROVYN — Curadoria de Origem para IA
 # modules/modulo1_filtro.py — Modulo I: Filtro de Entrada
 #
 # Padroes de projeto: Strategy (ScoreStrategy), Facade (FilterEngine),
@@ -246,7 +246,7 @@ class FilterEngine:
 
         df = df.copy()
         df["score_contaminacao"] = resultados.apply(lambda r: r["score_contaminacao"])
-        df["classificacao_coia"] = resultados.apply(lambda r: r["classificacao"])
+        df["classificacao_provyn"] = resultados.apply(lambda r: r["classificacao"])
 
         for chave in self._chaves_pesos:
             df[f"score_{chave}"] = resultados.apply(
@@ -256,10 +256,10 @@ class FilterEngine:
 
     def filtrar_dataset(self, df: pd.DataFrame) -> Tuple[pd.DataFrame, pd.DataFrame]:
         """Retorna (corpus_limpo, corpus_sintetico)."""
-        if "classificacao_coia" not in df.columns:
+        if "classificacao_provyn" not in df.columns:
             df = self.analisar_dataset(df)
-        limpo = df[df["classificacao_coia"] == "humano"].copy()
-        sintetico = df[df["classificacao_coia"] == "sintetico"].copy()
+        limpo = df[df["classificacao_provyn"] == "humano"].copy()
+        sintetico = df[df["classificacao_provyn"] == "sintetico"].copy()
         return limpo, sintetico
 
     def metricas_resumo(self, df: pd.DataFrame) -> Dict:
@@ -270,8 +270,8 @@ class FilterEngine:
         if "score_contaminacao" not in df.columns:
             return {}
         total = len(df)
-        n_sinteticos = int((df["classificacao_coia"] == "sintetico").sum()) \
-            if "classificacao_coia" in df.columns else 0
+        n_sinteticos = int((df["classificacao_provyn"] == "sintetico").sum()) \
+            if "classificacao_provyn" in df.columns else 0
         n_humanos = total - n_sinteticos
         return {
             "total_registros":   total,
